@@ -928,7 +928,7 @@ function handleWithdraw(e) {
         return;
     }
 
-    if (daysPaid === 0 || daysPaid % 7 !== 0) {
+    if (daysPaid <= 0 || daysPaid % 7 !== 0) {
         alert('Solo puedes retirar dinero en tus días de ciclo correspondientes (cada 7 días).');
         return;
     }
@@ -1105,6 +1105,7 @@ function adminSaveUser() {
             if (referrerUser) {
                 const bonus = addedInvestment * 0.07;
                 referrerUser.balance += bonus;
+                referrerUser.earnings += bonus;
                 saveUserToDB(referrerUser);
 
                 // Notificar al referente
@@ -1116,6 +1117,7 @@ function adminSaveUser() {
                         "var(--success)"
                     );
                     currentUserBalance = referrerUser.balance;
+                    currentUserEarnings = referrerUser.earnings;
                     updateDashboardStats(); // Update immediately
                 }
             }
@@ -1530,6 +1532,7 @@ function applyInvestment() {
                 if (referrerUser) {
                     const bonus = (netInvestment * 0.07);
                     referrerUser.balance += bonus;
+                    referrerUser.earnings += bonus;
 
                     // Notificar al referente si está logueado o simplemente registrarlo
                     if (currentUser && currentUser.username.toLowerCase() === referrerUser.username.toLowerCase()) {
@@ -1540,6 +1543,7 @@ function applyInvestment() {
                             "var(--success)"
                         );
                         currentUserBalance = referrerUser.balance; // Actualizar balance local si es el mismo usuario
+                        currentUserEarnings = referrerUser.earnings; // Actualizar ganancias totales locales si es el mismo usuario
                     }
                     saveUserToDB(referrerUser); // Asegurar que el referente guarda su nueva comisión instantáneamente
                 }
