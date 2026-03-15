@@ -365,7 +365,7 @@ function renderAffiliateTree() {
     // Update ref input link locally
     const refInput = document.getElementById('ref-input');
     if (refInput) {
-        refInput.value = `https://universalprofits.com/?ref=${currentUser.username}`;
+        refInput.value = `${currentUser.username}`;
     }
 
     // Update Prizes
@@ -1541,6 +1541,7 @@ function applyInvestment() {
                         );
                         currentUserBalance = referrerUser.balance; // Actualizar balance local si es el mismo usuario
                     }
+                    saveUserToDB(referrerUser); // Asegurar que el referente guarda su nueva comisión instantáneamente
                 }
             }
             saveUserToDB(dbUser);
