@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Profits</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@300;400;600&display=swap"
+        rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <!-- Background Animation Canvas -->
+    <canvas id="starsCanvas"></canvas>
+
+    <!-- VIEWS CONTAINER -->
+    <div id="app-container">
+
+        <!-- Welcome View Removed -->
+
+        <!-- Login View -->
+        <section id="view-login" class="view auth-view active">
+            <div class="auth-box">
+                <div class="logo-container">
+                    <img src="logos/logo_luxury_crest_1773454223151.png" alt="Universal Profits Logo" class="main-logo">
+                </div>
+                <h2 class="auth-title">Iniciar Sesión</h2>
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label>Usuario</label>
+                        <input type="text" id="login-identifier" required placeholder="tu_usuario">
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña</label>
+                        <input type="password" id="login-password" required placeholder="••••••••">
+                    </div>
+                    <div class="auth-links">
+                        <a href="#" onclick="navigate('forgot-password')">¿Olvidó su contraseña?</a>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+                </form>
+                <div class="auth-footer">
+                    <span>¿No tienes cuenta?</span> <a href="#" onclick="navigate('register')">Regístrate</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Register View -->
+        <section id="view-register" class="view auth-view">
+            <div class="auth-box auth-box-large">
+                <div class="logo-container">
+                    <img src="logos/logo_luxury_crest_1773454223151.png" alt="Universal Profits Logo" class="main-logo">
+                </div>
+                <h2 class="auth-title">Crear Cuenta</h2>
+                <form onsubmit="handleRegister(event)">
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Nombre</label>
+                            <input type="text" id="reg-firstname" required placeholder="Juan">
+                        </div>
+                        <div class="form-group half">
+                            <label>Apellido</label>
+                            <input type="text" id="reg-lastname" required placeholder="Pérez">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre de Usuario</label>
+                        <input type="text" id="reg-username" required placeholder="juanperez">
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña</label>
+                        <input type="password" id="reg-password" required placeholder="••••••••">
+                    </div>
+                    <div class="form-group">
+                        <label>Código de Referido (Opcional)</label>
+                        <input type="text" id="reg-ref" placeholder="Usuario que invitó">
+                    </div>
+                    <div class="form-group terms-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" required>
+                            <span>Acepto los <a href="#" onclick="showTerms()">Términos y Condiciones</a></span>
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Registrarse</button>
+                </form>
+                <div class="auth-footer">
+                    <span>¿Ya tienes cuenta?</span> <a href="#" onclick="navigate('login')">Inicia Sesión</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Recovery Words View -->
+        <section id="view-recovery-words" class="view auth-view">
+            <div class="auth-box">
+                <div class="logo-container">
+                    <img src="logos/logo_luxury_crest_1773454223151.png" alt="Universal Profits Logo" class="main-logo">
+                </div>
+                <h2 class="auth-title">Copia estas palabras</h2>
+                <p class="auth-subtitle" style="color: var(--danger);">Guarda estas 5 palabras de seguridad. Son la
+                    <strong>única forma</strong> de recuperar tu cuenta si olvidas la contraseña. No las compartas.</p>
+                <div class="form-group mt-4">
+                    <div id="recovery-words-display"
+                        style="padding: 15px; background: rgba(255,255,255,0.05); border: 1px solid var(--gold-primary); text-align: center; font-size: 1.2rem; letter-spacing: 2px; color: var(--gold-primary); margin-bottom: 20px;">
+                        <!-- JS injected words -->
+                    </div>
+                </div>
+                <button onclick="confirmRecoveryWords()" class="btn btn-primary btn-block">Ya las he guardado</button>
+            </div>
+        </section>
+
+        <!-- Forgot Password View -->
+        <section id="view-forgot-password" class="view auth-view">
+            <div class="auth-box">
+                <div class="logo-container">
+                    <img src="logos/logo_luxury_crest_1773454223151.png" alt="Universal Profits Logo" class="main-logo">
+                </div>
+                <h2 class="auth-title">Recuperar Acceso</h2>
+                <p class="auth-subtitle">Ingrese su usuario y las 5 palabras de recuperación.</p>
+                <form onsubmit="handleForgotPassword(event)" id="form-forgot">
+                    <div class="form-group">
+                        <label>Usuario</label>
+                        <input type="text" id="forgot-username" required placeholder="Su usuario">
+                    </div>
+                    <div class="form-group">
+                        <label>Palabras de Recuperación (separadas por espacio)</label>
+                        <input type="text" id="forgot-words" required
+                            placeholder="palabra1 palabra2 palabra3 palabra4 palabra5">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Verificar Palabras</button>
+                </form>
+
+                <form onsubmit="handleResetPassword(event)" id="form-reset" style="display: none;">
+                    <div class="form-group">
+                        <label>Nueva Contraseña</label>
+                        <input type="password" id="reset-new-password" required placeholder="••••••••">
+                    </div>
+                    <div class="form-group">
+                        <label>Repita la nueva contraseña</label>
+                        <input type="password" id="reset-confirm-password" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Cambiar Contraseña</button>
+                </form>
+                <div class="auth-footer">
+                    <a href="#" onclick="navigate('login')">Volver a Inicio de Sesión</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Layout -->
+        <section id="view-dashboard-layout" class="view dashboard-layout">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <img src="logos/logo_luxury_crest_1773454223151.png" alt="Universal Profits Logo"
+                        class="sidebar-logo">
+                    <h2 class="brand-name-small">U<span class="gold">P</span></h2>
+                </div>
+                <nav class="sidebar-nav">
+                    <a href="#" class="nav-item active" onclick="switchDashboardView('dashboard')"><i
+                            class="fas fa-home"></i> Dashboard</a>
+                    <a href="#" class="nav-item" onclick="switchDashboardView('invest')"><i class="fas fa-coins"></i>
+                        Invertir</a>
+                    <a href="#" class="nav-item" onclick="switchDashboardView('withdraw')"><i class="fas fa-wallet"></i>
+                        Retirar</a>
+                    <a href="#" class="nav-item" onclick="switchDashboardView('affiliates')"><i
+                            class="fas fa-users"></i> Red de Afiliados</a>
+                    <a href="#" class="nav-item" onclick="switchDashboardView('prizes')"><i class="fas fa-gift"></i>
+                        Premios y Plan</a>
+                    <a href="#" class="nav-item" onclick="switchDashboardView('notifications')">
+                        <i class="fas fa-bell"></i> Notificaciones
+                        <span class="badge"
+                            style="background: var(--danger); color: white; margin-left: auto; font-size: 0.7rem; padding: 2px 6px; display: none;">0</span>
+                    </a>
+                    <a href="#" class="nav-item" onclick="switchDashboardView('settings')"><i class="fas fa-cog"></i>
+                        Configuración</a>
+                    <a href="#" class="nav-item" id="admin-menu-item" onclick="switchDashboardView('admin')"
+                        style="display: none;"><i class="fas fa-user-shield"></i> Panel de Admin</a>
+                </nav>
+                <div class="sidebar-footer">
+                    <a href="#" class="nav-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Dashboard Sub-view -->
+                <div id="subview-dashboard" class="subview active">
+                    <header class="content-header">
+                        <h2>Panel General</h2>
+                        <div class="user-info">
+                            <span>Bienvenido, <strong id="welcome-username">Usuario</strong></span>
+                        </div>
+                    </header>
+                    <div class="dashboard-grid">
+                        <div class="stat-card">
+                            <i class="fas fa-balance-scale"></i>
+                            <div class="stat-info">
+                                <h3>Balance Disponible</h3>
+                                <p class="stat-value" id="stat-balance">$0.00</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-chart-line"></i>
+                            <div class="stat-info">
+                                <h3>Inversión Activa</h3>
+                                <p class="stat-value" id="stat-invested">$0.00</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-hand-holding-usd"></i>
+                            <div class="stat-info">
+                                <h3>Ganancias Totales</h3>
+                                <p class="stat-value" id="stat-earnings">$0.00</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel mt-4 chart-container">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h3>Crecimiento de la Cuenta</h3>
+                            <div>
+                                <button class="btn btn-outline"
+                                    style="padding: 5px 10px; font-size: 0.8rem; margin-right: 10px;"
+                                    onclick="simulateDailyPayment()"><i class="fas fa-clock"></i> Simular 6:00
+                                    PM</button>
+                                <span class="badge gold" id="days-paid"><i class="fas fa-calendar-check"></i> Días
+                                    Transcurridos: 0</span>
+                            </div>
+                        </div>
+                        <canvas id="growthChart" height="100"></canvas>
+                    </div>
+
+                    <div class="panel mt-4">
+                        <h3>Información de Mercado</h3>
+                        <p class="text-muted">Rendimientos basados en trading y acciones estratégicas (Oro, Nasdaq,
+                            US30).</p>
+                        <div class="returns-info">
+                            <div class="return-tier">
+                                <h4>
+                                    < $500</h4>
+                                        <p>0.80% / Día</p>
+                            </div>
+                            <div class="return-tier">
+                                <h4>$600 - $5k</h4>
+                                <p>1.10% / Día</p>
+                            </div>
+                            <div class="return-tier">
+                                <h4>> $10k</h4>
+                                <p>1.80% / Día</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Invest Sub-view -->
+                <div id="subview-invest" class="subview">
+                    <header class="content-header">
+                        <h2>Invertir</h2>
+                    </header>
+                    <div class="invest-container panel">
+                        <div class="invest-info">
+                            <h3>Realizar Depósito (USDT TRC20)</h3>
+
+                            <!-- Amount Entry Step -->
+                            <div id="deposit-step-1">
+                                <p>Ingrese primero el monto que desea invertir.</p>
+                                <div class="form-group" style="margin-bottom: 20px;">
+                                    <label>Monto a Depositar (USDT)</label>
+                                    <input type="number" id="deposit-amount-input" required placeholder="0.00" min="10">
+                                </div>
+                                <button class="btn btn-primary" onclick="initiateDeposit()">Depositar</button>
+                            </div>
+
+                            <!-- QR Code and Scanning Step (Hidden Initially) -->
+                            <div id="deposit-step-2" style="display: none; margin-top: 20px;">
+                                <p>Escanee el código QR o copie la dirección de la billetera a continuación para
+                                    realizar su transferencia por <strong class="gold"
+                                        id="display-deposit-amount">$0.00</strong>.</p>
+
+                                <div class="qr-box mt-4">
+                                    <!-- Placeholder for QR code, can be an API call to generated QR -->
+                                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=TGCEGCmXpcxEv8RwyebbCUyHAYn8ugCVZ7&color=d4af37&bgcolor=1a1a1a"
+                                        alt="QR Code" id="qr-image">
+                                </div>
+
+                                <div class="wallet-address mt-2">
+                                    <input type="text" readonly value="TGCEGCmXpcxEv8RwyebbCUyHAYn8ugCVZ7"
+                                        id="wallet-input">
+                                    <button class="btn btn-outline" onclick="copyWallet()">Copiar</button>
+                                </div>
+
+                                <div class="fee-notice mt-4">
+                                    <i class="fas fa-info-circle"></i>
+                                    <p><strong>Nota:</strong> Se aplicará un fee de comisión única del 5% al verificar
+                                        su depósito en TRONSCAN.</p>
+                                </div>
+
+                                <div class="mt-4"
+                                    style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px; border: 1px solid var(--panel-border);">
+                                    <h4>Notificar Transferencia</h4>
+                                    <p class="small-text text-muted mt-2">Una vez hayas realizado la transferencia desde
+                                        tu billetera, presiona el botón de abajo para enviar la solicitud de
+                                        confirmación al sistema.</p>
+                                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                        <button class="btn btn-primary" onclick="verifyDeposit()"
+                                            id="btn-verify">Depósito Enviado</button>
+                                        <button class="btn btn-danger" onclick="cancelDeposit()" id="btn-cancel">Anular
+                                            Depósito</button>
+                                    </div>
+                                    <p id="verify-status" class="mt-2 text-muted" style="display: none;"></p>
+
+                                    <div id="apply-investment-section"
+                                        style="display: none; margin-top: 15px; background: rgba(212, 175, 55, 0.1); padding: 15px; border-radius: 8px;">
+                                        <p>Depósito aprobado: <strong class="gold" id="detected-balance">$0.00</strong>
+                                        </p>
+                                        <p class="small-text">Fee de activación (5%): <span class="text-danger"
+                                                id="detected-fee">$0.00</span></p>
+                                        <button class="btn btn-primary mt-2" onclick="applyInvestment()">Pagar 5% y
+                                            Activar Inversión</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Withdraw Sub-view -->
+                <div id="subview-withdraw" class="subview">
+                    <header class="content-header">
+                        <h2>Retirar Fondos</h2>
+                    </header>
+                    <div class="panel withdraw-panel">
+                        <h3>Solicitar Retiro</h3>
+                        <p class="text-muted">Los retiros se procesan exclusivamente luego de completar ciclos de 7
+                            días. Se aplicará un 5% de comisión por retiro.</p>
+
+                        <div id="withdraw-status" class="mt-4"
+                            style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 8px; border: 1px solid var(--danger); margin-bottom: 20px;">
+                            <h4 style="color: var(--danger);"><i class="fas fa-lock"></i> Retiros Bloqueados</h4>
+                            <p class="small-text mt-2">Días restantes para su próximo periodo de retiro: <strong
+                                    id="withdraw-days-left">7 días</strong></p>
+                        </div>
+
+                        <form onsubmit="handleWithdraw(event)" class="mt-4" id="withdraw-form">
+                            <div class="form-group">
+                                <label>Monto a retirar (USDT)</label>
+                                <input type="number" min="10" required placeholder="0.00" id="withdraw-amount">
+                            </div>
+                            <div class="form-group">
+                                <label>Seleccionar Billetera</label>
+                                <select id="withdraw-wallet-select" onchange="toggleNewWalletInput()">
+                                    <option value="saved">Wallet Guardada</option>
+                                    <option value="new">Añadir Nueva Wallet</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="new-wallet-group" style="display: none;">
+                                <label>Dirección de nueva billetera (USDT TRC20)</label>
+                                <input type="text" placeholder="Su dirección de billetera" id="withdraw-new-wallet">
+                            </div>
+                            <div class="form-group" id="saved-wallet-display-group">
+                                <label>Wallet de destino</label>
+                                <input type="text" readonly value="No hay wallet guardada" id="withdraw-saved-wallet"
+                                    style="background: rgba(255,255,255,0.05); color: var(--gold-primary);">
+                            </div>
+                            <button class="btn btn-primary" id="btn-withdraw" disabled>Solicitar Retiro</button>
+                        </form>
+
+                        <hr class="divider">
+
+                        <h3>Cancelar Contrato de Inversión</h3>
+                        <p class="text-danger small-text">Precaución: Cancelar su inversión anticipadamente tiene
+                            penalizaciones. Si tiene menos de 4 meses: 20% de comisión. Más de 4 meses: 10% de comisión.
+                        </p>
+                        <button class="btn btn-danger mt-2" onclick="cancelContract()">Cancelar Inversión</button>
+                    </div>
+                </div>
+
+                <!-- Affiliates Sub-view -->
+                <div id="subview-affiliates" class="subview">
+                    <header class="content-header">
+                        <h2>Red de Afiliados</h2>
+                    </header>
+                    <div class="panel">
+                        <h3>Su Enlace de Referido</h3>
+                        <p class="text-muted small-text">¡Gana automáticamente un <strong>7%</strong> del capital de
+                            cada inversión o reinversión que realicen tus afiliados directamente a tu cuenta!</p>
+                        <div class="wallet-address mt-2">
+                            <input type="text" readonly value="https://universalprofits.com/?ref=usuario123"
+                                id="ref-input">
+                            <button class="btn btn-outline" onclick="copyRef()">Copiar</button>
+                        </div>
+                        <div class="affiliate-stats mt-4">
+                            <div class="stat-card">
+                                <h3>Total Referidos Activos</h3>
+                                <p class="stat-value" id="stat-total-referrals">0</p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Ganancias de Red (7%)</h3>
+                                <p class="stat-value" id="stat-total-ref-earnings" style="color: var(--success);">$0.00
+                                </p>
+                            </div>
+                        </div>
+
+                        <hr class="divider">
+                        <h3>Árbol Genealógico de Afiliados</h3>
+                        <div class="tree-container mt-4">
+                            <div class="tree-node root-node">
+                                <span class="node-icon"><i class="fas fa-crown gold"></i></span>
+                                <div class="node-details">
+                                    <h4><span id="tree-username">Josue10</span> (Tú)</h4>
+                                </div>
+                            </div>
+                            <div class="tree-branches" id="affiliate-tree-branches">
+                                <!-- JS Injected Affiliates -->
+                                <p class="small-text text-muted" style="padding-left: 20px;">Aún no tienes referidos.
+                                </p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Prizes Sub-view -->
+                <div id="subview-prizes" class="subview">
+                    <header class="content-header">
+                        <h2>Premios y Plan de Compensación</h2>
+                    </header>
+                    <div class="panel">
+                        <h3>1. Modelo de Inversión</h3>
+                        <ul style="list-style: none; padding-left: 0; margin-top: 15px; display: grid; gap: 10px;">
+                            <li><i class="fas fa-chart-line gold"></i> <strong>Rentabilidad diaria:</strong> 0.80% a
+                                1.80% según el capital invertido.</li>
+                            <li><i class="fas fa-calendar-alt gold"></i> <strong>Pagos:</strong> de lunes a viernes.
+                            </li>
+                            <li><i class="fas fa-bullseye gold"></i> <strong>Objetivo del contrato:</strong> la
+                                inversión trabaja hasta alcanzar el 200% (doblar el capital).</li>
+                            <li><i class="fas fa-undo gold"></i> <strong>Cierre de contrato:</strong> al alcanzar el
+                                200%, el contrato se cierra pudiendo reinvertir o crear uno nuevo.</li>
+                        </ul>
+
+                        <hr class="divider">
+
+                        <h3>2. Comisiones (Fees)</h3>
+                        <ul style="list-style: none; padding-left: 0; margin-top: 15px; display: grid; gap: 10px;">
+                            <li><i class="fas fa-bolt gold"></i> <strong>Activación de inversión:</strong> 5% adicional
+                                al monto invertido.</li>
+                            <li><i class="fas fa-money-bill-wave gold"></i> <strong>Comisión de retiro:</strong> 5% por
+                                cada retiro.</li>
+                            <li><i class="fas fa-exclamation-triangle gold"></i> <strong>Cancelación
+                                    anticipada:</strong>
+                                <ul
+                                    style="margin-left: 25px; margin-top: 5px; list-style: disc; color: var(--text-muted);">
+                                    <li>Antes de 4 meses: 20% de penalidad.</li>
+                                    <li>Después de 4 meses: 10% de penalidad.</li>
+                                </ul>
+                            </li>
+                            <li><i class="fas fa-calendar-check gold"></i> <strong>Retiros:</strong> semanales cada 7
+                                días.</li>
+                        </ul>
+
+                        <hr class="divider">
+
+                        <h3>3. Sistema de Referidos (Escalonado)</h3>
+                        <p class="text-muted mt-2" style="font-size: 0.95rem;"><strong>Comisión base:</strong> 7% por
+                            cada inversión de un referido.</p>
+
+                        <h4 class="mt-4 mb-2">Niveles por volumen de red:</h4>
+                        <div class="returns-info">
+                            <div class="return-tier">
+                                <h4>50,000 USD </h4>
+                                <p>8.5%</p>
+                            </div>
+                            <div class="return-tier">
+                                <h4>100,000 USD </h4>
+                                <p>9.5%</p>
+                            </div>
+                            <div class="return-tier">
+                                <h4>500,000 USD </h4>
+                                <p>11%</p>
+                            </div>
+                        </div>
+                        <p class="text-muted mt-2 small-text"><i class="fas fa-info-circle"></i> Las ganancias por bonos
+                            no pueden superar el 200% del contrato del usuario.</p>
+
+                        <h3>4. Premios por Volumen de Red</h3>
+                        <div class="prizes-grid mt-4" id="prizes-grid-container"
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+                            <!-- Prizes injected by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notifications Sub-view -->
+                <div id="subview-notifications" class="subview">
+                    <header class="content-header">
+                        <h2>Centro de Notificaciones</h2>
+                        <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;"
+                            onclick="clearNotifications()">Marcar todas como leídas</button>
+                    </header>
+                    <div class="panel">
+                        <div class="notification-list" id="notifications-container">
+                            <!-- Dynamic notifications will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Sub-view -->
+                <div id="subview-settings" class="subview">
+                    <header class="content-header"
+                        style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>Configuración</h2>
+                        <button type="button" class="btn btn-outline" id="btn-edit-profile"
+                            onclick="toggleEditProfile()"><i class="fas fa-edit"></i> Editar Datos</button>
+                    </header>
+                    <div class="panel settings-panel">
+                        <form onsubmit="handleSettings(event)">
+                            <h3>Datos Personales</h3>
+                            <div class="form-row">
+                                <div class="form-group half">
+                                    <label>Nombre</label>
+                                    <input type="text" id="settings-firstname" disabled>
+                                </div>
+                                <div class="form-group half">
+                                    <label>Apellido</label>
+                                    <input type="text" id="settings-lastname" disabled>
+                                </div>
+                            </div>
+
+                            <hr class="divider">
+
+                            <h3>Cambiar Contraseña</h3>
+                            <div class="form-group">
+                                <label>Contraseña Actual</label>
+                                <input type="password" id="settings-current-pass" placeholder="••••••••" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label>Nueva Contraseña</label>
+                                <input type="password" id="settings-new-pass" placeholder="••••••••" disabled>
+                            </div>
+
+                            <hr class="divider">
+
+                            <h3>Billetera Predeterminada</h3>
+                            <p class="text-muted small-text">Esta wallet será usada para tus retiros automáticos o
+                                manuales.</p>
+                            <div class="form-group mt-2">
+                                <label>Dirección USDT TRC20</label>
+                                <input type="text" id="settings-wallet"
+                                    placeholder="Ej. T... (Dejar en blanco si no tiene)" disabled>
+                            </div>
+
+                            <hr class="divider">
+
+                            <h3>Apariencia</h3>
+                            <div class="form-group">
+                                <label>Tema Visual</label>
+                                <div class="theme-toggle">
+                                    <button type="button" class="btn btn-outline active" id="btn-theme-dark"
+                                        onclick="setTheme('dark')">Oscuro con Dorado</button>
+                                    <button type="button" class="btn btn-outline" id="btn-theme-light"
+                                        onclick="setTheme('light')">Blanco con Dorado</button>
+                                </div>
+                            </div>
+
+                            <div class="mt-4">
+                                <button type="submit" class="btn btn-primary" id="btn-save-settings"
+                                    style="opacity: 0.5; cursor: not-allowed;" disabled>Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Admin Sub-view -->
+                <div id="subview-admin" class="subview">
+                    <header class="content-header">
+                        <h2>Panel de Administración Pro</h2>
+                        <span class="text-danger"><i class="fas fa-shield-alt"></i> Acceso Total</span>
+                    </header>
+                    <div class="panel">
+                        <h3>Gestión de Usuarios</h3>
+                        <p class="text-muted">Busca y modifica balances, retiros e inversiones de cualquier usuario
+                            dentro del sistema.</p>
+                        <div class="form-group mt-4">
+                            <input type="text" id="admin-search-user"
+                                placeholder="Buscar usuario por nombre de usuario...">
+                            <button class="btn btn-outline mt-2" onclick="adminSearchUser()">Buscar</button>
+                        </div>
+
+                        <!-- Admin User Edit Panel -->
+                        <div id="admin-user-edit-section"
+                            style="display: none; background: rgba(255,255,255,0.02); padding: 15px; border-radius: 8px; border: 1px solid var(--panel-border); margin-top: 15px;">
+                            <h4 class="gold"><i class="fas fa-user-edit"></i> Administrando a: <span
+                                    id="admin-edit-username"></span></h4>
+                            <div class="form-row mt-3">
+                                <div class="form-group half">
+                                    <label>Balance Disponible ($)</label>
+                                    <input type="number" id="admin-edit-balance" step="0.01">
+                                </div>
+                                <div class="form-group half">
+                                    <label>Inversión Activa ($)</label>
+                                    <input type="number" id="admin-edit-invested" step="0.01">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group half">
+                                    <label>Nueva Contraseña (Opcional)</label>
+                                    <input type="password" id="admin-edit-password" placeholder="... para cambiarla">
+                                </div>
+                                <div class="form-group half">
+                                    <label>Wallet (USDT TRC20)</label>
+                                    <input type="text" id="admin-edit-wallet" placeholder="Dirección">
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                <button class="btn btn-primary" onclick="adminSaveUser()"><i class="fas fa-save"></i>
+                                    Guardar Cambios</button>
+                                <button class="btn btn-danger" onclick="adminDeleteUser()"><i class="fas fa-trash"></i>
+                                    Eliminar Usuario</button>
+                            </div>
+                        </div>
+
+                        <div class="mt-4" style="overflow-x: auto;">
+                            <h4>Validación de Transacciones Pendientes</h4>
+                            <table style="width: 100%; text-align: left; border-collapse: collapse; margin-top: 10px;"
+                                id="admin-transactions-table">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid var(--panel-border);">
+                                        <th style="padding: 10px;">Usuario</th>
+                                        <th style="padding: 10px;">Tipo de Transacción</th>
+                                        <th style="padding: 10px;">Monto</th>
+                                        <th style="padding: 10px;">Estado</th>
+                                        <th style="padding: 10px;">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style="border-bottom: 1px solid rgba(212,175,55,0.1);">
+                                        <td style="padding: 10px; color: var(--text-muted);" colspan="5"
+                                            id="empty-transactions-msg">No hay transacciones pendientes.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <hr class="divider">
+
+                        <h3>Fondo y Control General</h3>
+                        <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--panel-border);">
+                                    <th style="padding: 10px;">Usuario</th>
+                                    <th style="padding: 10px;">Balance</th>
+                                    <th style="padding: 10px;">Inversión</th>
+                                    <th style="padding: 10px;">Referente</th>
+                                    <th style="padding: 10px;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-all-users-tbody">
+                                <!-- JS Injected Users -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+    </div>
+    </main>
+    </section>
+    </div>
+
+    <!-- Modal Terms -->
+    <div id="terms-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeTerms()">&times;</span>
+            <h2>Términos y Condiciones</h2>
+            <div class="terms-text">
+                <h3>1. Naturaleza de la plataforma</h3>
+                <p>La plataforma se fundamenta en la ejecución de estrategias automatizadas de trading algorítmico,
+                    operadas mediante un conjunto de 10 robots (bots) financieros especializados, diseñados para
+                    analizar y ejecutar operaciones dentro de los mercados de oro (XAUUSD), Nasdaq (NAS100) y US30 (Dow
+                    Jones).</p>
+                <p>Estos sistemas utilizan modelos estadísticos, gestión algorítmica de riesgo y análisis de volatilidad
+                    del mercado para identificar oportunidades de entrada y salida. Cada robot opera con una lógica
+                    estratégica distinta, lo que permite diversificar el riesgo y optimizar el rendimiento global de la
+                    cartera.</p>
+                <p>La integración de múltiples bots en un sistema unificado permite distribuir las operaciones en
+                    diferentes condiciones de mercado, aumentando la probabilidad de generar resultados consistentes en
+                    distintos escenarios financieros.</p>
+
+                <h3>2. Dividendos y rendimientos estimados</h3>
+                <p>Los usuarios que participan en la plataforma podrán recibir dividendos diarios estimados, derivados
+                    de los resultados obtenidos por las estrategias automatizadas. La estructura de rendimiento estimado
+                    se distribuye de la siguiente manera:</p>
+                <ul>
+                    <li>0.80% diario para inversiones inferiores a $500 USD</li>
+                    <li>1.10% diario para inversiones entre $600 USD y $5,000 USD</li>
+                    <li>1.80% diario para inversiones superiores a $10,000 USD</li>
+                </ul>
+                <p>Estos dividendos provienen de la actividad operativa de los bots dentro de los mercados financieros
+                    mencionados. Los resultados pueden variar dependiendo de las condiciones del mercado, la volatilidad
+                    y la liquidez disponible. Los rendimientos se reflejan de manera progresiva dentro de la cuenta del
+                    usuario y podrán ser retirados conforme a las condiciones establecidas en la plataforma.</p>
+
+                <h3>3. Comisión de activación</h3>
+                <p>Para iniciar cualquier inversión dentro de la plataforma, se aplicará una comisión única
+                    administrativa del 5% sobre el monto depositado. Esta comisión cubre los costos relacionados con:
+                </p>
+                <ul>
+                    <li>Configuración de la cuenta dentro del sistema</li>
+                    <li>Integración del capital a los robots operativos</li>
+                    <li>Mantenimiento tecnológico de la infraestructura</li>
+                    <li>Gestión y supervisión de los algoritmos de trading</li>
+                </ul>
+
+                <h3>4. Retiros de dividendos</h3>
+                <p>Los usuarios podrán solicitar el retiro de sus dividendos cada 7 días. Cada retiro estará sujeto a
+                    una comisión operativa del 5%, correspondiente a los costos asociados con la liquidez, procesamiento
+                    y ejecución de la transacción dentro del sistema.</p>
+
+                <h3>5. Cancelación del contrato o retiro del capital</h3>
+                <p>En caso de que un usuario decida retirar su capital principal antes del tiempo recomendado de
+                    permanencia, se aplicarán las siguientes condiciones:</p>
+                <ul>
+                    <li>Cancelación antes de los primeros 4 meses: penalidad del 20% del capital invertido</li>
+                    <li>Cancelación después de los 4 meses: penalidad del 10% del capital invertido</li>
+                </ul>
+                <p>Estas condiciones se establecen con el objetivo de mantener la estabilidad operativa de las
+                    estrategias algorítmicas y la gestión eficiente del capital dentro del sistema.</p>
+
+                <h3>6. Métodos de depósito y retiro</h3>
+                <p>Todos los depósitos y retiros dentro de la plataforma se realizarán exclusivamente mediante USDT en
+                    la red TRC20, lo cual permite procesamientos rápidos, costos de transacción reducidos y mayor
+                    eficiencia en la gestión de pagos internacionales. Los usuarios deben verificar cuidadosamente las
+                    direcciones de billetera antes de realizar cualquier transferencia.</p>
+
+                <h3>7. Riesgos de la inversión</h3>
+                <p>La participación en esta plataforma implica un nivel elevado de riesgo financiero. Los mercados en
+                    los que operan los robots —como el mercado de índices y commodities— se caracterizan por su alta
+                    volatilidad. Aunque las estrategias automatizadas están diseñadas para optimizar resultados y
+                    gestionar el riesgo de manera eficiente, no existe garantía absoluta de ganancias ni de rendimientos
+                    constantes.</p>
+                <p>Los usuarios deben entender que:</p>
+                <ul>
+                    <li>Los mercados financieros pueden experimentar movimientos impredecibles.</li>
+                    <li>Los resultados pasados no garantizan resultados futuros.</li>
+                    <li>Existe la posibilidad de pérdidas parciales o totales del capital invertido.</li>
+                </ul>
+                <p>Por esta razón, se recomienda que cada usuario invierta únicamente capital que esté dispuesto a
+                    asumir como parte de una estrategia de alto riesgo.</p>
+
+                <h3>8. Exención de responsabilidad</h3>
+                <p>Universal Profits LLC proporciona una plataforma tecnológica destinada a la gestión de estrategias
+                    automatizadas de inversión. La empresa no actúa como asesor financiero personalizado ni garantiza
+                    resultados específicos. Universal Profits LLC no se hace responsable por:</p>
+                <ul>
+                    <li>El uso indebido de la plataforma por parte de los usuarios.</li>
+                    <li>Transferencias enviadas a direcciones de billeteras incorrectas.</li>
+                    <li>Errores cometidos por el usuario durante el proceso de depósito o retiro.</li>
+                    <li>Decisiones de inversión tomadas por los participantes.</li>
+                </ul>
+                <p>Debido a la naturaleza de la tecnología blockchain, las transacciones confirmadas no pueden ser
+                    revertidas ni modificadas, por lo que cada usuario es responsable de verificar cuidadosamente la
+                    información antes de realizar cualquier operación.</p>
+
+                <h3>9. Aceptación de los términos</h3>
+                <p>Al registrarse, depositar fondos o utilizar cualquier servicio dentro de la plataforma, el usuario
+                    declara haber leído, comprendido y aceptado plenamente los presentes términos y condiciones, así
+                    como los riesgos asociados con este tipo de inversión.</p>
+
+                <p><strong>Firmado:</strong><br>Universal Profits LLC</p>
+            </div>
+            <button class="btn btn-primary mt-4" onclick="closeTerms()">Entendido</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
