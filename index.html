@@ -154,6 +154,18 @@
 
         <!-- Dashboard Layout -->
         <section id="view-dashboard-layout" class="view dashboard-layout">
+            <!-- Mobile Header (Hidden on Desktop) -->
+            <div class="mobile-header" style="display: none;">
+                <div class="mobile-header-left">
+                    <button class="mobile-menu-toggle" onclick="toggleMobileSidebar()"><i class="fas fa-bars"></i></button>
+                </div>
+                <div class="mobile-logo-container">
+                    <img src="logos/logo_luxury_crest_1773454223151.png" alt="UP Logo" class="mobile-logo">
+                    <h2 class="mobile-brand-name">U<span class="gold">P</span></h2>
+                </div>
+                <div style="width: 24px;"></div> <!-- Spacer for flex centering -->
+            </div>
+
             <!-- Sidebar -->
             <aside class="sidebar">
                 <div class="sidebar-header" onclick="switchDashboardView('dashboard')" style="cursor: pointer;">
@@ -177,8 +189,12 @@
                         <span class="badge"
                             style="background: var(--danger); color: white; margin-left: auto; font-size: 0.7rem; padding: 2px 6px; display: none;">0</span>
                     </a>
+                    <a href="#" class="nav-item" onclick="switchDashboardView('ticket')"><i class="fas fa-ticket-alt"></i>
+                        Ticket Soporte</a>
                     <a href="#" class="nav-item" onclick="switchDashboardView('settings')"><i class="fas fa-cog"></i>
                         Configuración</a>
+                    <a href="#" class="nav-item" onclick="switchDashboardView('info')"><i class="fas fa-info-circle"></i>
+                        Información</a>
                     <a href="#" class="nav-item" id="admin-menu-item" onclick="switchDashboardView('admin')"
                         style="display: none;"><i class="fas fa-user-shield"></i> Panel de Admin</a>
                 </nav>
@@ -216,8 +232,31 @@
                             <i class="fas fa-hand-holding-usd"></i>
                             <div class="stat-info">
                                 <h3>Ganancias Totales</h3>
-                                <p class="stat-value" id="stat-earnings">$0.00</p>
+                                <div style="display: flex; align-items: center; gap: 15px; margin-top: 5px;">
+                                    <p class="stat-value" id="stat-earnings" style="margin: 0;">$0.00</p>
+                                    
+                                    <!-- Circular Progress Bar -->
+                                    <div class="progress-circle" id="earnings-progress-circle">
+                                        <svg>
+                                            <circle cx="20" cy="20" r="18"></circle>
+                                            <circle cx="20" cy="20" r="18" class="progress" id="earnings-progress-bar"></circle>
+                                        </svg>
+                                        <div class="progress-text" id="earnings-progress-text">0%</div>
+                                    </div>
+                                </div>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <div id="multiple-investments-btn-container" style="display: none; text-align: center; margin-top: 15px;">
+                        <button class="btn btn-outline" style="width: 100%; border-color: var(--gold-primary); color: var(--gold-primary);" onclick="showMoreInvestments()"><i class="fas fa-layer-group"></i> Ver más inversiones</button>
+                    </div>
+
+                    <div id="more-investments-panel" class="panel mt-4" style="display: none; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border);">
+                        <button class="btn btn-outline" style="margin-bottom: 15px; font-size: 0.8rem; padding: 5px 10px;" onclick="hideMoreInvestments()"><i class="fas fa-arrow-left"></i> Primera Inversión</button>
+                        <h3 class="gold"><i class="fas fa-boxes"></i> Panel de Inversiones Adicionales</h3>
+                        <div id="additional-investments-list" class="mt-4">
+                            <!-- Inyectado via JS -->
                         </div>
                     </div>
 
@@ -276,8 +315,8 @@
                             <div id="deposit-step-1">
                                 <p>Ingrese primero el monto que desea invertir.</p>
                                 <div class="form-group" style="margin-bottom: 20px;">
-                                    <label>Monto a Depositar (USDT)</label>
-                                    <input type="number" id="deposit-amount-input" required placeholder="0.00" min="10">
+                                    <label>Monto a Depositar (USDT) <span class="text-muted" style="font-size: 0.8rem;">(Mínimo 50 USDT)</span></label>
+                                    <input type="number" id="deposit-amount-input" required placeholder="Ej. 50" min="50">
                                 </div>
                                 <button class="btn btn-primary" onclick="initiateDeposit()">Depositar</button>
                             </div>
@@ -354,8 +393,8 @@
 
                         <form onsubmit="handleWithdraw(event)" class="mt-4" id="withdraw-form">
                             <div class="form-group">
-                                <label>Monto a retirar (USDT)</label>
-                                <input type="number" min="10" required placeholder="0.00" id="withdraw-amount">
+                                <label>Monto a retirar (USDT) <span class="text-muted" style="font-size: 0.8rem;">(Mínimo 50 USDT)</span></label>
+                                <input type="number" min="50" required placeholder="Ej. 50" id="withdraw-amount">
                             </div>
                             <div class="form-group">
                                 <label>Seleccionar Billetera</label>
@@ -379,10 +418,28 @@
                         <hr class="divider">
 
                         <h3>Cancelar Contrato de Inversión</h3>
-                        <p class="text-danger small-text">Precaución: Cancelar su inversión anticipadamente tiene
-                            penalizaciones. Si tiene menos de 4 meses: 20% de comisión. Más de 4 meses: 10% de comisión.
-                        </p>
-                        <button class="btn btn-danger mt-2" onclick="cancelContract()">Cancelar Inversión</button>
+                        
+                        <div style="background: rgba(255, 77, 79, 0.1); border-left: 4px solid var(--danger); padding: 15px; border-radius: 8px; margin-top: 15px;">
+                            <p class="text-danger small-text"><strong>PRECAUCIÓN ROJA:</strong> Cancelar su inversión anticipadamente tiene penalizaciones:</p>
+                            <ul class="text-danger small-text mt-2" style="list-style: disc; margin-left: 20px;">
+                                <li>Si tiene <strong>menos de 4 meses</strong>: Se desconta un <strong>20%</strong> de comisión.</li>
+                                <li>Si tiene <strong>más de 4 meses</strong>: Se desconta un <strong>10%</strong> de comisión.</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="mt-4" id="cancel-contract-details" style="background: rgba(255,255,255,0.02); padding: 15px; border: 1px solid var(--panel-border); border-radius: 8px;">
+                            <p class="small-text"><i class="fas fa-coins gold"></i> Inversión Total Actual: <strong class="gold" id="cancel-total-invested">$0.00</strong></p>
+                            <p class="small-text mt-1"><i class="fas fa-hourglass-half"></i> Tiempo transcurrido: <strong id="cancel-time-elapsed">0 Meses</strong></p>
+                            <p class="small-text mt-1"><i class="fas fa-exclamation-circle text-danger"></i> Penalidad Estimada: <strong class="text-danger" id="cancel-penalty-amount">$0.00</strong></p>
+                            <p class="small-text mt-1" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; margin-top: 10px;"><i class="fas fa-check-double text-success"></i> Monto a Recibir: <strong class="text-success" id="cancel-receive-amount">$0.00</strong></p>
+                            
+                            <div class="form-group mt-3">
+                                <label>Destino: agregue a donde quiere que llegue el dinero de su inversión</label>
+                                <input type="text" id="cancel-wallet-destination" placeholder="Escriba su wallet USDT TRC20" style="background: rgba(0,0,0,0.3); border: 1px solid var(--danger);">
+                            </div>
+                            
+                            <button class="btn btn-danger mt-2" style="width: 100%; font-weight: bold;" onclick="cancelContract()"><i class="fas fa-radiation"></i> Cancelar Inversión Definitivamente</button>
+                        </div>
                     </div>
                 </div>
 
@@ -578,6 +635,74 @@
                                     style="opacity: 0.5; cursor: not-allowed;" disabled>Guardar Cambios</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+
+                <!-- Ticket Sub-view -->
+                <div id="subview-ticket" class="subview">
+                    <header class="content-header">
+                        <h2>Soporte y Tickets</h2>
+                    </header>
+                    <div class="panel">
+                        <h3>Enviar un Ticket</h3>
+                        <p class="text-muted small-text">¿Tienes alguna duda o problema? Escríbenos y un administrador te responderá lo antes posible.</p>
+                        
+                        <form onsubmit="submitTicket(event)" class="mt-4">
+                            <div class="form-group">
+                                <label>Asunto</label>
+                                <input type="text" id="ticket-subject" required placeholder="Ej. Problema con depósito">
+                            </div>
+                            <div class="form-group">
+                                <label>Mensaje</label>
+                                <textarea id="ticket-desc" required placeholder="Describe detalladamente tu situación..." style="width: 100%; height: 100px; padding: 12px; background: var(--input-bg); color: var(--text-main); border: 1px solid var(--panel-border); border-radius: 6px;"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Enviar Ticket</button>
+                        </form>
+
+                        <hr class="divider">
+
+                        <h3>Historial de Tickets</h3>
+                        <div id="user-tickets-container" class="mt-4">
+                            <!-- Dynamics Tickets generated here via JS -->
+                            <p class="text-muted">Cargando tickets...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Sub-view -->
+                <div id="subview-info" class="subview">
+                    <header class="content-header">
+                        <h2>Información y Guía Rápida</h2>
+                    </header>
+                    <div class="panel">
+                        <h3>¿Cómo funciona Universal Profits?</h3>
+                        <p class="text-muted mt-2">Bienvenido a Universal Profits. Esta guía rápida te enseñará paso a paso cómo multiplicar tu capital e interactuar con la plataforma.</p>
+                        
+                        <div class="mt-4" style="background: rgba(212,175,55,0.05); border-left: 4px solid var(--gold-primary); padding: 15px; border-radius: 8px;">
+                            <h4 class="gold"><i class="fas fa-step-forward"></i> Paso 1: Configurar Billetera</h4>
+                            <p class="small-text mt-2">Antes de invertir o retirar, ve a <strong>Configuración</strong> y guarda tu dirección de billetera de la red USDT TRC20. Esta dirección se usará para enviarte tus ganancias.</p>
+                        </div>
+
+                        <div class="mt-4" style="background: rgba(212,175,55,0.05); border-left: 4px solid var(--gold-primary); padding: 15px; border-radius: 8px;">
+                            <h4 class="gold"><i class="fas fa-step-forward"></i> Paso 2: Invitar Personas y Ganar Bono</h4>
+                            <p class="small-text mt-2">Puedes referir amigos o familiares compartiendo tu <strong>Código de Referido</strong> (es simplemente tu nombre de usuario). Cuando ellos se registren usando tu código e inviertan, ganarás automáticamente el 7% de lo que ellos invierten, sumado a tu balance al instante.</p>
+                        </div>
+
+                        <div class="mt-4" style="background: rgba(212,175,55,0.05); border-left: 4px solid var(--gold-primary); padding: 15px; border-radius: 8px;">
+                            <h4 class="gold"><i class="fas fa-step-forward"></i> Paso 3: Invertir tu Primer Contrato</h4>
+                            <ul class="small-text mt-2 text-muted" style="list-style: disc; margin-left: 20px;">
+                                <li class="mt-1">Dirígete al área de <strong>Invertir</strong> en el menú lateral.</li>
+                                <li class="mt-1">Pon la cantidad de USDT que deseas invertir (mínimo $10 USDT).</li>
+                                <li class="mt-1">Haz clic en <strong>Depositar</strong>. Comenzará a cargar y te mostrará un <strong>Código QR</strong> y una dirección de billetera (USDT TRC20).</li>
+                                <li class="mt-1">Transfiere los fondos exactamente desde tu wallet a nuestra dirección (recuerda que hay un 5% de comisión de activación).</li>
+                                <li class="mt-1">Presiona <strong>Depósito Enviado</strong>. Espera la confirmación del administrador.</li>
+                            </ul>
+                        </div>
+
+                        <div class="mt-4" style="background: rgba(212,175,55,0.05); border-left: 4px solid var(--gold-primary); padding: 15px; border-radius: 8px;">
+                            <h4 class="gold"><i class="fas fa-step-forward"></i> Paso 4: Mantener tu Inversión Activa</h4>
+                            <p class="small-text mt-2">De lunes a viernes a las 6:00 PM (hora estipulada), tus rendimientos diarios serán acreditados automáticamente a tu Dashboard. Los fines de semana el mercado permanece cerrado y no genera rendimientos. Si quieres retirar, dirígete a <strong>Retirar</strong> (revisando si completaste tus días de ciclo).</p>
+                        </div>
                     </div>
                 </div>
 

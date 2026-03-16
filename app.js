@@ -136,14 +136,20 @@ async function deleteUserFromDB(username) {
 // Sincroniza variables locales del usuario actual a la BD
 function syncCurrentUserLocalVarsToDB() {
     if (!currentUser) return;
-    const matchedUser = window.usersDB?.find(u => u.username === currentUser.username);
+    const matchedUser = usersDB.find(u => u.username === currentUser.username);
     if (matchedUser) {
         matchedUser.balance = currentUserBalance;
         matchedUser.invested = currentUserInvested;
         matchedUser.earnings = currentUserEarnings;
         matchedUser.wallet = savedWalletAddress;
+        matchedUser.daysPaid = daysPaid;
+        matchedUser.realDaysElapsed = realDaysElapsed;
 
         if (!matchedUser.pendingDeposits) matchedUser.pendingDeposits = [];
+        if (!matchedUser.tickets) matchedUser.tickets = [];
+        if (!matchedUser.investments) {
+            matchedUser.investments = currentUserInvested > 0 ? [{ id: 'inv_1', amount: currentUserInvested, earnings: currentUserEarnings, active: true }] : [];
+        }
 
         saveUserToDB(matchedUser);
     }
@@ -199,8 +205,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentUserEarnings = matchedUser.earnings;
                 savedWalletAddress = matchedUser.wallet;
                 simulatedDeposit = parseFloat(localStorage.getItem('up_simulatedDeposit')) || 0;
-                daysPaid = parseInt(localStorage.getItem('up_daysPaid')) || 0;
-                realDaysElapsed = parseInt(localStorage.getItem('up_realDaysElapsed')) || 0;
+                daysPaid = matchedUser.daysPaid !== undefined ? matchedUser.daysPaid : (parseInt(localStorage.getItem('up_daysPaid')) || 0);
+                realDaysElapsed = matchedUser.realDaysElapsed !== undefined ? matchedUser.realDaysElapsed : (parseInt(localStorage.getItem('up_realDaysElapsed')) || 0);
 
                 if (currentUser.isAdmin) {
                     document.getElementById('admin-menu-item').style.display = 'flex';
@@ -525,12 +531,8 @@ function simulateDailyPayment() {
 
     // Supongamos que día 1 es Lunes, día 6 es sábado, y día 7 (0) es Domingo
     let dayOfWeek = (realDaysElapsed % 7);
-    let maxEarnings = currentUserInvested * 2; // El doble de su capital (Ciclo de 200%)
-
-    if (currentUserEarnings >= maxEarnings) {
-        alert('Has alcanzado el ciclo máximo del 200% para esta inversión. Tu paquete actual no generará más rendimientos hasta realizar una reinversión.');
-        return;
-    }
+    
+    const matchedUser = usersDB.find(u => u.username === currentUser.username);
 
     if (dayOfWeek === 6 || dayOfWeek === 0) {
         // Fin de semana
@@ -542,34 +544,54 @@ function simulateDailyPayment() {
         );
         daysPaid++; // El ciclo de 7 días avanza igual, aunque no se pague
     } else {
-        // Calcular porcentaje diario según el capital
-        let dailyPercent = 0;
-        if (currentUserInvested < 600) {
-            dailyPercent = 0.0080; // 0.80%
-        } else if (currentUserInvested >= 600 && currentUserInvested < 10000) {
-            dailyPercent = 0.0110; // 1.10%
-        } else if (currentUserInvested >= 10000) {
-            dailyPercent = 0.0180; // 1.80%
+        
+        let totalEarningsAdded = 0;
+        
+        // Loop over each investment and calculate separatedly
+        if(matchedUser && matchedUser.investments) {
+            matchedUser.investments.forEach((inv, index) => {
+                if(!inv.active) return;
+                
+                let maxEarnings = inv.amount * 2;
+                if(inv.earnings >= maxEarnings) return; // Ya terminó su ciclo de 200%
+                
+                let dailyPercent = 0;
+                if (inv.amount < 600) {
+                    dailyPercent = 0.0080; // 0.80%
+                } else if (inv.amount >= 600 && inv.amount < 10000) {
+                    dailyPercent = 0.0110; // 1.10%
+                } else if (inv.amount >= 10000) {
+                    dailyPercent = 0.0180; // 1.80%
+                }
+                
+                let earningsForThisInv = inv.amount * dailyPercent;
+                
+                if (inv.earnings + earningsForThisInv > maxEarnings) {
+                    earningsForThisInv = maxEarnings - inv.earnings; // limit to 200%
+                    addNotification("Ciclo 200% Finalizado", `La Inversión #${index+1} ha completado su límite máximo del 200%.`, "fa-check-double", "var(--success)");
+                }
+                
+                inv.earnings += earningsForThisInv;
+                totalEarningsAdded += earningsForThisInv;
+            });
+            
+            // Recalculate total local vars based on investments arr to stay sync
+            let totalErn = 0;
+            matchedUser.investments.forEach(inv => totalErn += inv.earnings);
+            currentUserEarnings = totalErn;
         }
 
-        let earnings = currentUserInvested * dailyPercent;
-
-        // Limitar ganancias al 200% máximo
-        if (currentUserEarnings + earnings > maxEarnings) {
-            earnings = maxEarnings - currentUserEarnings; // Ajuste final para no sobrepasar
-            addNotification("Ciclo 200% Finalizado", `Has completado el límite máximo del 200% de esta inversión.`, "fa-check-double", "var(--success)");
-        }
-
-        currentUserEarnings += earnings;
-        currentUserBalance += earnings; // Adds to available balance
+        currentUserBalance += totalEarningsAdded; // Adds to available general balance
 
         // Add specific notification for user
-        addNotification(
-            "Rendimiento Diario Acreditado",
-            `¡Felicidades! Usted ha recibido su porción diaria de ganancias (<strong>$${earnings.toFixed(2)}</strong>).`,
-            "fa-sync-alt",
-            "var(--success)"
-        );
+        if(totalEarningsAdded > 0) {
+            addNotification(
+                "Rendimiento Diario Acreditado",
+                `¡Felicidades! Usted ha recibido ganancias de la red por (<strong>$${totalEarningsAdded.toFixed(2)}</strong>).`,
+                "fa-sync-alt",
+                "var(--success)"
+            );
+        }
 
         daysPaid++;
     }
@@ -644,11 +666,11 @@ function handleLogin(e) {
         document.getElementById('welcome-username').innerText = displayFirstname;
         document.getElementById('tree-username').innerText = displayFirstname;
 
-        // Reset local ui state
+        // Load local ui state properly
         chartLabels = ['Inicio'];
         chartData = [0];
-        daysPaid = 0;
-        realDaysElapsed = 0;
+        daysPaid = matchedUser.daysPaid || 0;
+        realDaysElapsed = matchedUser.realDaysElapsed || 0;
 
         updateDashboardStats();
         updateWithdrawalStatus();
@@ -790,9 +812,111 @@ function switchDashboardView(subViewId) {
     if (subViewId === 'invest') {
         checkApprovedDeposits();
     }
+    
+    if (subViewId === 'withdraw') {
+        updateCancelContractDetails();
+    }
+    
+    // Si estamos en movil, cerramos el menu luego de clickear una opcion
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar && sidebar.classList.contains('mobile-open')) {
+        sidebar.classList.remove('mobile-open');
+    }
 
     // For mobile: if we pick an option, we might want to auto-scroll up
     window.scrollTo(0, 0);
+}
+
+function toggleMobileSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+        sidebar.classList.toggle('mobile-open');
+    }
+}
+
+// --- Ticket System Variables ---
+let currentTicketTarget = null;
+function submitTicket(e) {
+    if (e) e.preventDefault();
+    const subject = document.getElementById('ticket-subject').value;
+    const desc = document.getElementById('ticket-desc').value;
+    
+    if(!subject || !desc) return;
+    
+    const matchedUser = usersDB.find(u => u.username === currentUser.username);
+    if(matchedUser) {
+        if(!matchedUser.tickets) matchedUser.tickets = [];
+        const newTicket = {
+            id: 'tkt_' + Date.now(),
+            date: new Date().toLocaleDateString(),
+            subject: subject,
+            desc: desc,
+            status: 'pending',
+            answer: ''
+        };
+        matchedUser.tickets.push(newTicket);
+        saveUserToDB(matchedUser);
+        
+        // Notify admin
+        addPendingAdminTransaction(matchedUser.username, 'Ticket', subject);
+        
+        alert("Tu ticket ha sido enviado correctamente.");
+        document.getElementById('ticket-subject').value = '';
+        document.getElementById('ticket-desc').value = '';
+        renderUserTickets();
+    }
+}
+
+function renderUserTickets() {
+    if(!currentUser) return;
+    const matchedUser = usersDB.find(u => u.username === currentUser.username);
+    const container = document.getElementById('user-tickets-container');
+    if(!matchedUser || !container) return;
+    
+    if(!matchedUser.tickets || matchedUser.tickets.length === 0) {
+        container.innerHTML = '<p class="text-muted">No tienes tickets enviados aún.</p>';
+        return;
+    }
+    
+    let html = '';
+    matchedUser.tickets.reverse().forEach(t => {
+        let statusHtml = t.status === 'pending' ? '<span style="color:var(--gold-primary);">Pendiente de Respuesta</span>' : '<span style="color:var(--success);">Respondido</span>';
+        let answerHtml = t.answer ? `<div style="margin-top: 10px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 5px;"><strong style="color: var(--success);"><i class="fas fa-headset"></i> Respuesta de Soporte:</strong><p style="margin-top:5px; font-size:0.9rem;">${t.answer}</p></div>` : '';
+        html += `
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <strong style="color: var(--gold-primary);">${t.subject}</strong>
+                    <span style="font-size:0.8rem;" class="text-muted">${t.date}</span>
+                </div>
+                <p style="margin-top: 10px; font-size: 0.95rem;">${t.desc}</p>
+                <div style="margin-top: 10px; font-size: 0.85rem;">Status: ${statusHtml}</div>
+                ${answerHtml}
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+function answerTicketAdmin(btn, username, targetTicketId) {
+    const parent = btn.parentNode;
+    const answerInput = parent.querySelector('.admin-ticket-answer');
+    const answer = answerInput.value;
+    
+    if(!answer) { alert("Escribe una respuesta primero."); return; }
+    
+    const matchedUser = usersDB.find(u => u.username === username);
+    if(matchedUser && matchedUser.tickets) {
+        const tkt = matchedUser.tickets.find(t => t.id === targetTicketId);
+        if(tkt) {
+            tkt.status = 'answered';
+            tkt.answer = answer;
+            saveUserToDB(matchedUser);
+            
+            // Reemplazar boton por un "respondido"
+            parent.innerHTML = '<span style="color: var(--success)"><i class="fas fa-check"></i> Ticket Respondido</span>';
+            alert("Respuesta enviada al usuario.");
+        }
+    }
 }
 
 
@@ -960,9 +1084,89 @@ function handleWithdraw(e) {
     }
 }
 
+function updateCancelContractDetails() {
+    if (!currentUser) return;
+    
+    // Asumimos que la cancelación total es sobre TODAS las inversiones.
+    // También se puede actualizar para permitir elegir cuál cancelar, 
+    // pero para este caso sumaremos todo el amount invertido.
+    
+    const matchedUser = usersDB.find(u => u.username === currentUser.username);
+    let totalActivo = 0;
+    
+    if (matchedUser && matchedUser.investments) {
+        matchedUser.investments.forEach(inv => {
+            if(inv.active) totalActivo += inv.amount;
+        });
+    } else {
+        totalActivo = currentUserInvested;
+    }
+    
+    const formatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+    document.getElementById('cancel-total-invested').innerText = formatter.format(totalActivo);
+    
+    // Calculate months elapsed roughly based on realDaysElapsed (30 days = 1 month)
+    const monthsElapsed = Math.floor(realDaysElapsed / 30);
+    document.getElementById('cancel-time-elapsed').innerText = `${monthsElapsed} Meses`;
+    
+    // Penalidad calculation
+    let penaltyPercent = 0.20; // 20% default si < 4 meses
+    if (monthsElapsed >= 4) {
+        penaltyPercent = 0.10; // 10% si >= 4 meses
+    }
+    
+    const penaltyAmount = totalActivo * penaltyPercent;
+    const finalAmount = totalActivo - penaltyAmount;
+    
+    document.getElementById('cancel-penalty-amount').innerText = `${formatter.format(penaltyAmount)} (${penaltyPercent * 100}%)`;
+    document.getElementById('cancel-receive-amount').innerText = formatter.format(finalAmount);
+}
+
 function cancelContract() {
-    if (confirm('¿Estás seguro de cancelar tu contrato de inversión? Se aplicará una deducción del 20% si tu inversión tiene menos de 4 meses, o 10% si es mayor a 4 meses.')) {
-        alert('Contrato cancelado de acuerdo con los términos y condiciones.');
+    if (currentUserInvested <= 0) {
+        alert("No tienes ninguna inversión activa que cancelar.");
+        return;
+    }
+
+    const destination = document.getElementById('cancel-wallet-destination').value;
+    if(!destination) {
+        alert("Por favor, ingresa la billetera destino (USDT TRC20) donde deseas recibir tus fondos.");
+        document.getElementById('cancel-wallet-destination').focus();
+        return;
+    }
+
+    const monthsElapsed = Math.floor(realDaysElapsed / 30);
+    let penaltyPercent = 0.20;
+    if (monthsElapsed >= 4) {
+        penaltyPercent = 0.10;
+    }
+
+    if (confirm(`⚠️ ATENCIÓN: Estás a punto de cancelar toda tu inversión definitivamente.\n\nTiempo transcurrido: ${monthsElapsed} meses.\nSe te descontará una penalidad del ${penaltyPercent * 100}%.\n\nEl dinero se enviará a: ${destination}\n\n¿Estás completamente seguro de continuar con la cancelación?`)) {
+        
+        const penaltyAmount = currentUserInvested * penaltyPercent;
+        const finalAmountToReceive = currentUserInvested - penaltyAmount;
+        
+        // Remove active investment completely
+        currentUserInvested = 0;
+        
+        const matchedUser = usersDB.find(u => u.username === currentUser.username);
+        if(matchedUser) {
+            if(matchedUser.investments) {
+                // Deactivate all
+                matchedUser.investments.forEach(inv => inv.active = false);
+            }
+        }
+        
+        saveLocalDashboardState();
+        syncCurrentUserLocalVarsToDB();
+        updateDashboardStats();
+        
+        // Request "special" admin withdrawal for cancellation
+        addPendingAdminTransaction(currentUser.username, 'Cancelación (' + destination + ')', finalAmountToReceive);
+        
+        alert(`¡Inversión cancelada con éxito!\n\nUna solicitud de envío por $${finalAmountToReceive.toFixed(2)} USDT ha sido enviada al administrador a la billetera:\n${destination}\n\nNota: Has perdido tus posibles ganancias futuras.`);
+        
+        switchDashboardView('dashboard');
     }
 }
 
@@ -1213,8 +1417,8 @@ function initiateDeposit() {
     const inputField = document.getElementById('deposit-amount-input');
     const amount = parseFloat(inputField.value);
 
-    if (!amount || amount < 10) {
-        alert("Por favor, ingresa el monto a depositar (mínimo 10 USDT).");
+    if (!amount || amount < 50) {
+        alert("Por favor, ingresa el monto a depositar (mínimo 50 USDT).");
         return;
     }
 
@@ -1242,9 +1446,9 @@ function verifyDeposit() {
     const inputField = document.getElementById('deposit-amount-input');
     const amount = parseFloat(inputField.value);
 
-    // Mínimo de $10 exigido
-    if (!amount || amount < 10) {
-        alert("El depósito mínimo para entrar a Universal Profits es de $10 USDT. Por favor, ingresa una cantidad válida.");
+    // Mínimo de $50 exigido
+    if (!amount || amount < 50) {
+        alert("El depósito mínimo para entrar a Universal Profits es de $50 USDT. Por favor, ingresa una cantidad válida.");
         return;
     }
 
@@ -1376,15 +1580,26 @@ function addPendingAdminTransaction(username, type, amount) {
     const rowId = 'admin-row-' + Date.now();
 
     if (currentUser && currentUser.isAdmin) {
-        let msg = type === 'Depósito' ?
-            `El usuario <strong>${username}</strong> ha reportado un depósito de <strong>$${amount}</strong>. Revisa el Panel de Admin para confirmarlo.` :
-            `El usuario <strong>${username}</strong> ha solicitado un retiro de <strong>$${amount}</strong>. Revisa el Panel de Admin para procesarlo.`;
+        let msg = "";
+        let color = "";
+        let icon = "fa-exchange-alt";
+        
+        if(type === 'Ticket') {
+             msg = `El usuario <strong>${username}</strong> ha enviado un nuevo ticket: <strong>${amount}</strong>. Revisa el Panel de Admin.`;
+             color = "var(--gold-primary)";
+             icon = "fa-ticket-alt";
+        } else if (type === 'Depósito') {
+             msg = `El usuario <strong>${username}</strong> ha reportado un depósito de <strong>$${amount}</strong>. Revisa el Panel de Admin para confirmarlo.`;
+             color = 'gold';
+        } else {
+             msg = `El usuario <strong>${username}</strong> ha solicitado un retiro de <strong>$${amount}</strong>. Revisa el Panel de Admin para procesarlo.`;
+             color = 'var(--danger)';
+        }
 
-        let color = type === 'Depósito' ? 'gold' : 'var(--danger)';
         addNotification(
             type + " Pendiente",
             msg,
-            "fa-exchange-alt",
+            icon,
             color,
             `highlightAdminRow('${rowId}')`
         );
@@ -1396,22 +1611,45 @@ function addPendingAdminTransaction(username, type, amount) {
         dbUser.pendingDeposits.push({ id: rowId, amount: amount, status: 'pending' });
         saveUserToDB(dbUser);
     }
+    // tickets are already saved by submitTicket locally before calling this
 
     const row = document.createElement('tr');
     row.id = rowId;
     row.style.borderBottom = '1px solid rgba(212,175,55,0.1)';
     row.style.transition = 'background-color 0.5s ease';
 
-    const typeLabel = type === 'Depósito' ? `<span style="color: var(--gold-primary)">Depósito</span>` : `<span style="color: var(--danger)">Retiro</span>`;
+    let typeLabel = "";
+    if(type === 'Depósito') typeLabel = `<span style="color: var(--gold-primary)">Depósito</span>`;
+    else if(type === 'Ticket') typeLabel = `<span style="color: var(--gold-primary)"><i class="fas fa-headset"></i> Soporte</span>`;
+    else typeLabel = `<span style="color: var(--danger)">Retiro</span>`;
+    
+    let actionButtons = "";
+    if(type === 'Ticket') {
+        // Encontrar el último ticket del user para el ID (simplificado por asincronía)
+        const t = dbUser && dbUser.tickets && dbUser.tickets[dbUser.tickets.length -1];
+        const tid = t ? t.id : '';
+        actionButtons = `
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <input type="text" placeholder="Escribe tu respuesta..." class="admin-ticket-answer" style="padding: 5px; background: rgba(0,0,0,0.3); border: 1px solid var(--panel-border); color: #fff;">
+                <button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.8rem;" onclick="answerTicketAdmin(this, '${username}', '${tid}')"><i class="fas fa-paper-plane"></i> Responder</button>
+            </div>
+        `;
+    } else {
+        actionButtons = `
+            <button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.8rem;" onclick="approveTransactionAdmin(this, '${type}', '${username}', ${amount})"><i class="fas fa-check"></i> Confirmar</button>
+            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="denyTransactionAdmin(this, '${type}', '${username}', ${amount})"><i class="fas fa-times"></i> Rechazar</button>
+        `;
+    }
+
+    let amountValue = (type === 'Ticket') ? amount /* amount contains subject string here */ : '$' + amount;
 
     row.innerHTML = `
         <td style="padding: 10px;">${username}</td>
         <td style="padding: 10px;">${typeLabel}</td>
-        <td style="padding: 10px; color: var(--gold-primary);">$${amount}</td>
+        <td style="padding: 10px; color: var(--gold-primary);">${amountValue}</td>
         <td style="padding: 10px;"><span style="color: #d4af37;">En Revisión</span></td>
         <td style="padding: 10px; display: flex; gap: 5px;">
-            <button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.8rem;" onclick="approveTransactionAdmin(this, '${type}', '${username}', ${amount})"><i class="fas fa-check"></i> Confirmar</button>
-            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="denyTransactionAdmin(this, '${type}', '${username}', ${amount})"><i class="fas fa-times"></i> Rechazar</button>
+            ${actionButtons}
         </td>
     `;
     tBody.appendChild(row);
@@ -1525,6 +1763,12 @@ function applyInvestment() {
         const dbUser = usersDB.find(u => u.username === currentUser.username);
         if (dbUser) {
             dbUser.invested = currentUserInvested;
+            
+            if(!dbUser.investments) {
+                dbUser.investments = [{ id: 'inv_1', amount: netInvestment, earnings: 0, active: true }];
+            } else {
+                dbUser.investments.push({ id: 'inv_' + Date.now(), amount: netInvestment, earnings: 0, active: true });
+            }
 
             // Handle referral bonus
             if (dbUser.referrer) {

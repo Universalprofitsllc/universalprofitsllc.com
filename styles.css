@@ -468,6 +468,44 @@ hr.divider {
     color: var(--text-main);
 }
 
+/* Circular Progress Bar */
+.progress-circle {
+    position: relative;
+    width: 45px;
+    height: 45px;
+}
+.progress-circle svg {
+    width: 45px;
+    height: 45px;
+    transform: rotate(-90deg);
+}
+.progress-circle circle {
+    width: 45px;
+    height: 45px;
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 4;
+    cy: 22.5;
+    cx: 22.5;
+    r: 20;
+}
+.progress-circle .progress {
+    stroke: var(--success);
+    stroke-linecap: round;
+    stroke-dasharray: 125.6; /* 2 * PI * 20 */
+    stroke-dashoffset: 125.6; /* Start at 0% */
+    transition: stroke-dashoffset 1s ease-in-out;
+}
+.progress-circle .progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.65rem;
+    font-weight: bold;
+    color: var(--text-main);
+}
+
 .returns-info {
     display: flex;
     gap: 20px;
@@ -740,40 +778,91 @@ hr.divider {
     .dashboard-layout {
         flex-direction: column;
     }
-    .sidebar {
-        width: 100%;
-        height: auto;
-        min-height: auto;
-        position: relative;
-        flex-direction: row;
+    .mobile-header {
+        display: flex !important;
+        align-items: center;
+        background: var(--sidebar-bg);
         justify-content: space-between;
-        padding: 10px 20px;
+        padding: 5px 20px;
+        border-bottom: 1px solid var(--panel-border);
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 200;
+        height: 60px;
+    }
+    .mobile-header-left {
+        display: flex;
         align-items: center;
     }
-    .sidebar-header {
-        margin: 0;
-        padding: 0;
+    .mobile-menu-toggle {
+        background: transparent;
         border: none;
+        color: var(--gold-primary);
+        font-size: 1.5rem;
+        cursor: pointer;
+    }
+    .mobile-logo-container {
+        display: flex;
+        align-items: center;
+        margin: 0 auto; /* Center automatically within its remaining space */
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    .mobile-logo {
+        height: 35px;
+        margin-right: 5px;
+        border-radius: 4px;
+    }
+    .mobile-brand-name {
+        font-size: 1.5rem;
+        letter-spacing: 2px;
+        margin: 0;
+        font-family: 'Cinzel', serif;
+    }
+    
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: -250px; /* Hidden by default */
+        height: 100vh;
+        width: 250px;
+        transition: left 0.3s ease;
+        z-index: 150;
+        padding-top: 70px; /* Offset for Mobile header */
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: stretch;
+    }
+    .sidebar.mobile-open {
+        left: 0;
+    }
+    .sidebar-header {
+        display: none; /* Hide desktop header on mobile */
     }
     .sidebar-nav {
-        flex-direction: row;
-        overflow-x: auto;
-        padding-bottom: 5px;
-        margin: 0 15px;
+        flex-direction: column;
+        overflow-y: auto;
+        overflow-x: hidden;
+        margin: 0;
     }
     .nav-item {
-        padding: 10px;
-        font-size: 0.9rem;
-        border-left: none;
-        border-bottom: 3px solid transparent;
-        white-space: nowrap;
+        padding: 15px 20px;
+        font-size: 0.95rem;
+        border-left: 3px solid transparent;
+        border-bottom: none;
+        white-space: normal;
     }
     .nav-item.active {
-        border-left: none;
-        border-bottom: 3px solid var(--gold-primary);
+        border-bottom: none;
+        border-left: 3px solid var(--gold-primary);
     }
     .sidebar-footer {
-        display: none; /* Hide exit or put it inside nav */
+        display: block; /* Show exit inside nav for mobile inside sidebar */
+        margin-top: auto;
+        padding-bottom: 20px;
     }
     .mobile-logout-btn {
         display: block;
@@ -782,6 +871,7 @@ hr.divider {
         margin-left: 0;
         width: 100%;
         padding: 20px;
+        margin-top: 60px; /* offset for fixed mobile header */
     }
     .content-header {
         flex-direction: column;
