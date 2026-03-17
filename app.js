@@ -114,7 +114,17 @@ db.collection("users").onSnapshot((snapshot) => {
             currentUserEarnings = matchedUser.earnings;
             savedWalletAddress = matchedUser.wallet || "";
             updateDashboardStats();
-            if (currentUser.isAdmin) renderAdminUserList();
+            if (currentUser.isAdmin) {
+                renderAdminUserList();
+                // Refrescar mensajes del chat admin si está abierto
+                if (adminChatTargetUsername) adminRenderChatMessages();
+            } else {
+                // Refrescar vista de chat del usuario si está en esa sección
+                const ticketView = document.getElementById('subview-ticket');
+                if (ticketView && ticketView.classList.contains('active')) {
+                    renderChatView();
+                }
+            }
         }
     } else if (initialLoadDone && currentUser && currentUser.isAdmin) {
         renderAdminUserList();
@@ -817,6 +827,14 @@ function switchDashboardView(subViewId) {
         updateCancelContractDetails();
     }
     
+    if (subViewId === 'history') {
+        renderHistory('investments');
+    }
+    
+    if (subViewId === 'ticket') {
+        renderChat();
+    }
+    
     // Si estamos en movil, cerramos el menu luego de clickear una opcion
     const sidebar = document.querySelector('.sidebar');
     if (sidebar && sidebar.classList.contains('mobile-open')) {
@@ -834,87 +852,409 @@ function toggleMobileSidebar() {
     }
 }
 
-// --- Ticket System Variables ---
-let currentTicketTarget = null;
-function submitTicket(e) {
-    if (e) e.preventDefault();
-    const subject = document.getElementById('ticket-subject').value;
-    const desc = document.getElementById('ticket-desc').value;
-    
-    if(!subject || !desc) return;
-    
+// --- Chat System Logic ---
+
+let chatUnsubscribe = null; // Para limpiar el listener de Firebase cuando salgamos de la vista
+let adminChatTargetUsername = null; // El usuario cuyo chat está viendo el admin
+
+// Inicializa o reabre un chat para el usuario
+function openNewChat() {
+    if (!currentUser) return;
     const matchedUser = usersDB.find(u => u.username === currentUser.username);
-    if(matchedUser) {
-        if(!matchedUser.tickets) matchedUser.tickets = [];
-        const newTicket = {
-            id: 'tkt_' + Date.now(),
-            date: new Date().toLocaleDateString(),
-            subject: subject,
-            desc: desc,
-            status: 'pending',
-            answer: ''
-        };
-        matchedUser.tickets.push(newTicket);
-        saveUserToDB(matchedUser);
-        
-        // Notify admin
-        addPendingAdminTransaction(matchedUser.username, 'Ticket', subject);
-        
-        alert("Tu ticket ha sido enviado correctamente.");
-        document.getElementById('ticket-subject').value = '';
-        document.getElementById('ticket-desc').value = '';
-        renderUserTickets();
-    }
+    if (!matchedUser) return;
+
+    matchedUser.chat = {
+        status: 'open',
+        messages: matchedUser.chat ? (matchedUser.chat.messages || []) : []
+    };
+    saveUserToDB(matchedUser);
+    renderChatView();
 }
 
-function renderUserTickets() {
-    if(!currentUser) return;
+// Renderiza la vista de chat para el usuario (decide qué panel mostrar)
+function renderChatView() {
+    if (!currentUser || currentUser.isAdmin) return;
+
     const matchedUser = usersDB.find(u => u.username === currentUser.username);
-    const container = document.getElementById('user-tickets-container');
-    if(!matchedUser || !container) return;
-    
-    if(!matchedUser.tickets || matchedUser.tickets.length === 0) {
-        container.innerHTML = '<p class="text-muted">No tienes tickets enviados aún.</p>';
+
+    const startPanel     = document.getElementById('chat-start-panel');
+    const activePanel    = document.getElementById('chat-active-panel');
+    const closedNotice   = document.getElementById('chat-closed-notice');
+    const statusBadge    = document.getElementById('chat-status-badge');
+
+    if (!startPanel) return;
+
+    if (!matchedUser || !matchedUser.chat) {
+        // Sin chat iniciado nunca
+        startPanel.style.display = 'block';
+        activePanel.style.display = 'none';
+        closedNotice.style.display = 'none';
+        statusBadge.style.display = 'none';
         return;
     }
-    
-    let html = '';
-    matchedUser.tickets.reverse().forEach(t => {
-        let statusHtml = t.status === 'pending' ? '<span style="color:var(--gold-primary);">Pendiente de Respuesta</span>' : '<span style="color:var(--success);">Respondido</span>';
-        let answerHtml = t.answer ? `<div style="margin-top: 10px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 5px;"><strong style="color: var(--success);"><i class="fas fa-headset"></i> Respuesta de Soporte:</strong><p style="margin-top:5px; font-size:0.9rem;">${t.answer}</p></div>` : '';
-        html += `
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--panel-border); padding: 15px; border-radius: 8px; margin-bottom: 10px;">
-                <div style="display: flex; justify-content: space-between;">
-                    <strong style="color: var(--gold-primary);">${t.subject}</strong>
-                    <span style="font-size:0.8rem;" class="text-muted">${t.date}</span>
-                </div>
-                <p style="margin-top: 10px; font-size: 0.95rem;">${t.desc}</p>
-                <div style="margin-top: 10px; font-size: 0.85rem;">Status: ${statusHtml}</div>
-                ${answerHtml}
-            </div>
-        `;
-    });
-    container.innerHTML = html;
+
+    const chat = matchedUser.chat;
+
+    if (chat.status === 'closed') {
+        startPanel.style.display = 'none';
+        activePanel.style.display = 'none';
+        closedNotice.style.display = 'block';
+        statusBadge.style.display = 'inline-block';
+        statusBadge.style.background = 'rgba(255,77,79,0.15)';
+        statusBadge.style.color = 'var(--danger)';
+        statusBadge.style.border = '1px solid var(--danger)';
+        statusBadge.innerHTML = '<i class="fas fa-lock"></i> Cerrado';
+        return;
+    }
+
+    // Chat abierto
+    startPanel.style.display = 'none';
+    activePanel.style.display = 'flex';
+    closedNotice.style.display = 'none';
+    statusBadge.style.display = 'inline-block';
+    statusBadge.style.background = 'rgba(82,196,26,0.15)';
+    statusBadge.style.color = 'var(--success)';
+    statusBadge.style.border = '1px solid var(--success)';
+    statusBadge.innerHTML = '<i class="fas fa-circle" style="font-size:0.6rem;"></i> En línea';
+
+    renderChatMessages(chat.messages || [], 'chat-messages-container', currentUser.username);
 }
 
-function answerTicketAdmin(btn, username, targetTicketId) {
-    const parent = btn.parentNode;
-    const answerInput = parent.querySelector('.admin-ticket-answer');
-    const answer = answerInput.value;
+// Renderiza mensajes en un contenedor dado
+function renderChatMessages(messages, containerId, myUsername) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!messages || messages.length === 0) {
+        container.innerHTML = '<p class="text-muted" style="text-align:center; padding:20px;">No hay mensajes aún. ¡Escribe algo!</p>';
+        return;
+    }
+
+    container.innerHTML = messages.map(m => {
+        const isMine = m.sender === myUsername && !m.isAdmin;
+        const isAdminMsg = m.isAdmin;
+        // Si soy el admin viendo un chat: los mensajes del admin son "míos" (derecha)
+        let cssClass = '';
+        if (myUsername === '__admin__') {
+            cssClass = isAdminMsg ? 'msg-user' : 'msg-admin';
+        } else {
+            cssClass = isMine ? 'msg-user' : 'msg-admin';
+        }
+        const senderLabel = isAdminMsg ? 'Soporte' : m.sender;
+        return `
+            <div class="msg ${cssClass}">
+                <span style="font-size:0.7rem; opacity:0.6; display:block; margin-bottom:3px;">${senderLabel}</span>
+                <p>${m.text}</p>
+                <span class="msg-time">${m.time}</span>
+            </div>
+        `;
+    }).join('');
+    container.scrollTop = container.scrollHeight;
+}
+
+// Usuario envía mensaje
+function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+
+    const matchedUser = usersDB.find(u => u.username === currentUser.username);
+    if (!matchedUser || !matchedUser.chat || matchedUser.chat.status === 'closed') {
+        alert('El chat está cerrado. Abre uno nuevo para continuar.');
+        return;
+    }
+
+    if (!matchedUser.chat.messages) matchedUser.chat.messages = [];
+    matchedUser.chat.messages.push({
+        sender: currentUser.username,
+        text: message,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isAdmin: false
+    });
+    matchedUser.chat.status = 'open';
+
+    saveUserToDB(matchedUser);
+    input.value = '';
+    renderChatView();
+
+    // Notificación interna para que el admin sepa
+    addNotification(
+        "Nuevo Mensaje de Soporte",
+        `<strong>${currentUser.username}</strong>: ${message}`,
+        "fa-comments",
+        "var(--gold-primary)",
+        `switchDashboardView('admin')`
+    );
+}
+
+// Llama a renderChatView cuando entramos a la sección (ya existía esta llamada en switchDashboardView)
+function renderChat() {
+    renderChatView();
+}
+
+// --- Admin: gestión de chats ---
+
+// Renderiza la lista de chats en el panel admin
+function renderAdminChatList() {
+    const listEl = document.getElementById('admin-chats-list');
+    const noChatsMsg = document.getElementById('admin-no-chats-msg');
+    if (!listEl) return;
+
+    const usersWithChat = usersDB.filter(u => u.chat && u.chat.messages && u.chat.messages.length > 0);
+
+    if (usersWithChat.length === 0) {
+        noChatsMsg.style.display = 'block';
+        // Limpiar tarjetas anteriores
+        Array.from(listEl.children).forEach(child => {
+            if (child !== noChatsMsg) child.remove();
+        });
+        return;
+    }
+
+    noChatsMsg.style.display = 'none';
+    // Limpiar tarjetas anteriores
+    Array.from(listEl.children).forEach(child => {
+        if (child !== noChatsMsg) child.remove();
+    });
+
+    usersWithChat.forEach(u => {
+        const chat = u.chat;
+        const lastMsg = chat.messages[chat.messages.length - 1];
+        const isOpen = chat.status === 'open';
+        const isActive = adminChatTargetUsername === u.username;
+
+        const card = document.createElement('div');
+        card.style.cssText = `
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 18px; border-radius: 8px; cursor: pointer;
+            border: 1px solid ${isActive ? 'var(--gold-primary)' : 'var(--panel-border)'};
+            background: ${isActive ? 'rgba(212,175,55,0.1)' : 'var(--panel-bg)'};
+            transition: all 0.2s;
+        `;
+
+        const statusDot = isOpen
+            ? `<span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block;margin-right:6px;"></span>`
+            : `<span style="width:8px;height:8px;border-radius:50%;background:var(--danger);display:inline-block;margin-right:6px;"></span>`;
+
+        card.innerHTML = `
+            <div>
+                <div style="font-weight:600; color:var(--gold-primary); margin-bottom:4px;">
+                    ${statusDot}<i class="fas fa-user" style="margin-right:6px;"></i>${u.username}
+                    <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400; margin-left:8px;">${isOpen ? 'Abierto' : 'Cerrado'}</span>
+                </div>
+                <div style="font-size:0.85rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:300px;">
+                    ${lastMsg ? `${lastMsg.isAdmin ? 'Tú' : lastMsg.sender}: ${lastMsg.text}` : 'Sin mensajes'}
+                </div>
+            </div>
+            <span style="font-size:0.75rem; color:var(--text-muted);">${chat.messages.length} msg</span>
+        `;
+
+        card.onclick = () => adminOpenChat(u.username);
+        listEl.appendChild(card);
+    });
+}
+
+// Admin abre el chat de un usuario
+function adminOpenChat(username) {
+    adminChatTargetUsername = username;
+    const replyPanel = document.getElementById('admin-chat-reply-panel');
+    const targetNameEl = document.getElementById('admin-chat-target-name');
+    if (!replyPanel || !targetNameEl) return;
+
+    targetNameEl.innerText = username;
+    replyPanel.style.display = 'block';
+    replyPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    adminRenderChatMessages();
+    renderAdminChatList(); // Refrescar para marcar activo
+}
+
+// Renderiza los mensajes del chat seleccionado en el panel admin
+function adminRenderChatMessages() {
+    if (!adminChatTargetUsername) return;
+    const targetUser = usersDB.find(u => u.username === adminChatTargetUsername);
+    if (!targetUser || !targetUser.chat) return;
+
+    renderChatMessages(targetUser.chat.messages || [], 'admin-chat-messages', '__admin__');
+}
+
+// Admin envía mensaje al usuario
+function adminSendMessage() {
+    if (!adminChatTargetUsername) return;
+    const input = document.getElementById('admin-chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+
+    const targetUser = usersDB.find(u => u.username === adminChatTargetUsername);
+    if (!targetUser) return;
+
+    if (!targetUser.chat) targetUser.chat = { status: 'open', messages: [] };
+    if (!targetUser.chat.messages) targetUser.chat.messages = [];
+
+    targetUser.chat.messages.push({
+        sender: 'Admin',
+        text: message,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isAdmin: true
+    });
+    targetUser.chat.status = 'open';
+
+    saveUserToDB(targetUser);
+    input.value = '';
+    adminRenderChatMessages();
+}
+
+// Admin finaliza el chat
+function adminEndChat() {
+    if (!adminChatTargetUsername) return;
+    if (!confirm(`¿Finalizar el chat con ${adminChatTargetUsername}? El usuario verá que fue cerrado y podrá abrir uno nuevo.`)) return;
+
+    const targetUser = usersDB.find(u => u.username === adminChatTargetUsername);
+    if (!targetUser || !targetUser.chat) return;
+
+    targetUser.chat.status = 'closed';
+    saveUserToDB(targetUser);
+
+    adminChatTargetUsername = null;
+    document.getElementById('admin-chat-reply-panel').style.display = 'none';
+    renderAdminChatList();
+}
+
+// endChat ya no se usa directamente desde el usuario, pero lo mantenemos por compatibilidad
+function endChat() {
+    openNewChat();
+}
+
+// --- History System Logic ---
+function switchHistoryTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`.tab-btn[onclick*="${tabName}"]`).classList.add('active');
     
-    if(!answer) { alert("Escribe una respuesta primero."); return; }
+    document.querySelectorAll('.history-tab-content').forEach(content => content.classList.remove('active'));
+    document.getElementById(`hist-${tabName}`).classList.add('active');
     
-    const matchedUser = usersDB.find(u => u.username === username);
-    if(matchedUser && matchedUser.tickets) {
-        const tkt = matchedUser.tickets.find(t => t.id === targetTicketId);
-        if(tkt) {
-            tkt.status = 'answered';
-            tkt.answer = answer;
-            saveUserToDB(matchedUser);
-            
-            // Reemplazar boton por un "respondido"
-            parent.innerHTML = '<span style="color: var(--success)"><i class="fas fa-check"></i> Ticket Respondido</span>';
-            alert("Respuesta enviada al usuario.");
+    renderHistory(tabName);
+}
+
+function renderHistory(tab) {
+    const matchedUser = usersDB.find(u => u.username === currentUser.username);
+    if (!matchedUser) return;
+
+    const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+    function fmtDate(iso) {
+        if (!iso) return 'N/A';
+        const d = new Date(iso);
+        return d.toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            + ' ' + d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    if (tab === 'investments') {
+        const tbody = document.getElementById('hist-investments-tbody');
+        if (!tbody) return;
+        const invs = matchedUser.investments || [];
+
+        if (!invs.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">No hay inversiones registradas aún.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = invs.map((inv, i) => {
+            // Fecha: priorizar campo date, fallback al timestamp del id
+            let dateStr = 'N/A';
+            if (inv.date) {
+                dateStr = fmtDate(inv.date);
+            } else {
+                const ts = parseInt(inv.id.split('_')[1]);
+                if (ts && !isNaN(ts)) dateStr = fmtDate(new Date(ts).toISOString());
+            }
+
+            const pct = inv.dailyPct ? inv.dailyPct + '%' : (inv.amount < 600 ? '0.80%' : inv.amount < 10000 ? '1.10%' : '1.80%');
+            const statusStyle = inv.active ? 'color:var(--success); font-weight:600;' : 'color:var(--text-muted);';
+            const statusLabel = inv.active ? '✔ Activa' : 'Cerrada';
+            const earnings = inv.earnings || 0;
+            const maxEarnings = inv.amount * 2;
+            const progress = Math.min((earnings / maxEarnings) * 100, 100).toFixed(1);
+
+            return `
+                <tr>
+                    <td style="color:var(--text-muted); font-size:0.8rem;">#${i + 1}</td>
+                    <td style="color:var(--gold-primary); font-weight:600;">${fmt.format(inv.amount)}</td>
+                    <td style="color:var(--success);">${fmt.format(earnings)}</td>
+                    <td>
+                        <span style="font-size:0.8rem; background:rgba(212,175,55,0.1); padding:3px 8px; border-radius:10px; color:var(--gold-primary);">${pct} / día</span>
+                    </td>
+                    <td><span style="${statusStyle}">${statusLabel}</span>
+                        <div style="width:100%; background:rgba(255,255,255,0.07); height:4px; border-radius:2px; margin-top:4px;">
+                            <div style="width:${progress}%; background:var(--gold-primary); height:4px; border-radius:2px;"></div>
+                        </div>
+                        <span style="font-size:0.7rem; color:var(--text-muted);">${progress}% del 200%</span>
+                    </td>
+                    <td style="font-size:0.82rem; color:var(--text-muted);">${dateStr}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    if (tab === 'withdrawals') {
+        const tbody = document.getElementById('hist-withdrawals-tbody');
+        if (!tbody) return;
+        const wds = matchedUser.withdrawalHistory || [];
+
+        if (!wds.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:20px;">No hay retiros registrados aún.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = [...wds].reverse().map(wd => {
+            const statusMap = {
+                pending:  { label: '⏳ Pendiente',  color: 'var(--gold-primary)' },
+                approved: { label: '✔ Aprobado',    color: 'var(--success)' },
+                denied:   { label: '✖ Rechazado',   color: 'var(--danger)' }
+            };
+            const s = statusMap[wd.status] || statusMap.pending;
+            const walletShort = wd.wallet ? wd.wallet.slice(0, 8) + '...' + wd.wallet.slice(-4) : 'N/A';
+            return `
+                <tr>
+                    <td style="color:var(--gold-primary); font-weight:600;">${fmt.format(wd.amount)}</td>
+                    <td style="color:var(--danger); font-size:0.85rem;">${fmt.format(wd.fee || 0)} (5%)</td>
+                    <td title="${wd.wallet || ''}" style="font-size:0.8rem; color:var(--text-muted); cursor:default;">${walletShort}</td>
+                    <td style="color:${s.color}; font-weight:600;">${s.label}</td>
+                    <td style="font-size:0.82rem; color:var(--text-muted);">${fmtDate(wd.date)}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    if (tab === 'bonuses') {
+        const tbody = document.getElementById('hist-bonuses-tbody');
+        if (!tbody) return;
+
+        // Usar bonusHistory si existe (datos reales con fecha)
+        if (matchedUser.bonusHistory && matchedUser.bonusHistory.length > 0) {
+            tbody.innerHTML = [...matchedUser.bonusHistory].reverse().map(b => `
+                <tr>
+                    <td style="color:var(--gold-primary);">${b.from}</td>
+                    <td style="color:var(--success); font-weight:600;">+${fmt.format(b.amount)}</td>
+                    <td>${fmt.format(b.investedAmount)}</td>
+                    <td style="font-size:0.82rem; color:var(--text-muted);">${fmtDate(b.date)}</td>
+                </tr>
+            `).join('');
+        } else {
+            // Fallback: calcular desde referidos actuales (para datos pre-existentes)
+            const referrals = usersDB.filter(u => u.referrer && u.referrer.toLowerCase() === currentUser.username.toLowerCase() && u.invested > 0);
+            if (referrals.length) {
+                tbody.innerHTML = referrals.map(ref => `
+                    <tr>
+                        <td style="color:var(--gold-primary);">${ref.username}</td>
+                        <td style="color:var(--success); font-weight:600;">+${fmt.format(ref.invested * 0.07)}</td>
+                        <td>${fmt.format(ref.invested)}</td>
+                        <td style="color:var(--text-muted); font-size:0.82rem;">—</td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px;">No hay bonos generados aún.</td></tr>';
+            }
         }
     }
 }
@@ -1059,7 +1399,24 @@ function handleWithdraw(e) {
 
     // Simulate deduction (and 5% fee logic simply reducing balance)
     if (withdrawAmount > 0 && withdrawAmount <= currentUserBalance) {
+        const fee = withdrawAmount * 0.05;
+        const netWithdraw = withdrawAmount - fee;
         currentUserBalance -= withdrawAmount;
+
+        // Guardar en historial de retiros del usuario
+        const dbUser = usersDB.find(u => u.username === currentUser.username);
+        if (dbUser) {
+            if (!dbUser.withdrawalHistory) dbUser.withdrawalHistory = [];
+            dbUser.withdrawalHistory.push({
+                id: 'wd_' + Date.now(),
+                amount: withdrawAmount,
+                fee: fee,
+                net: netWithdraw,
+                wallet: targetWallet,
+                status: 'pending',
+                date: new Date().toISOString()
+            });
+        }
 
         syncCurrentUserLocalVarsToDB();
         updateDashboardStats();
@@ -1374,6 +1731,7 @@ function adminDeleteUser() {
 }
 
 function renderAdminUserList() {
+    renderAdminChatList(); // Actualizar lista de chats también
     const tBody = document.getElementById('admin-all-users-tbody');
     if (!tBody) return;
 
@@ -1728,6 +2086,16 @@ function approveTransactionAdmin(btnElement, type, username, amount) {
         }
         alert("💰 Has confirmado el depósito correctamente. El usuario ha sido notificado para activar su inversión.");
     } else {
+        // Marcar retiro como aprobado en historial del usuario
+        const dbUser = usersDB.find(u => u.username === username);
+        if (dbUser && dbUser.withdrawalHistory) {
+            const wd = dbUser.withdrawalHistory.slice().reverse().find(w => w.amount === amount && w.status === 'pending');
+            if (wd) {
+                wd.status = 'approved';
+                wd.processedDate = new Date().toISOString();
+            }
+            saveUserToDB(dbUser);
+        }
         alert("💸 Has procesado el retiro correctamente. El balance del usuario ya ha sido actualizado.");
     }
 }
@@ -1764,10 +2132,20 @@ function applyInvestment() {
         if (dbUser) {
             dbUser.invested = currentUserInvested;
             
+            const now = Date.now();
+            const dailyPct = netInvestment < 600 ? 0.80 : netInvestment < 10000 ? 1.10 : 1.80;
+            const newInv = {
+                id: 'inv_' + now,
+                amount: netInvestment,
+                earnings: 0,
+                active: true,
+                date: new Date().toISOString(),
+                dailyPct: dailyPct
+            };
             if(!dbUser.investments) {
-                dbUser.investments = [{ id: 'inv_1', amount: netInvestment, earnings: 0, active: true }];
+                dbUser.investments = [newInv];
             } else {
-                dbUser.investments.push({ id: 'inv_' + Date.now(), amount: netInvestment, earnings: 0, active: true });
+                dbUser.investments.push(newInv);
             }
 
             // Handle referral bonus
@@ -1777,6 +2155,15 @@ function applyInvestment() {
                     const bonus = (netInvestment * 0.07);
                     referrerUser.balance += bonus;
                     referrerUser.earnings += bonus;
+
+                    // Guardar bono en historial del referente
+                    if (!referrerUser.bonusHistory) referrerUser.bonusHistory = [];
+                    referrerUser.bonusHistory.push({
+                        from: dbUser.username,
+                        amount: bonus,
+                        investedAmount: netInvestment,
+                        date: new Date().toISOString()
+                    });
 
                     // Notificar al referente si está logueado o simplemente registrarlo
                     if (currentUser && currentUser.username.toLowerCase() === referrerUser.username.toLowerCase()) {
