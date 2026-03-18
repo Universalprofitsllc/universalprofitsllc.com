@@ -872,278 +872,261 @@ function toggleMobileSidebar() {
     }
 }
 
-// --- Chat System Logic ---
+// =============================================
+// SISTEMA DE CHAT — LIMPIO Y FUNCIONAL
+// =============================================
 
-let chatUnsubscribe = null; // Para limpiar el listener de Firebase cuando salgamos de la vista
-let adminChatTargetUsername = null; // El usuario cuyo chat está viendo el admin
+let adminChatTargetUsername = null;
 
-// Inicializa o reabre un chat para el usuario
+// ---- USUARIO: abrir nuevo chat ----
 function openNewChat() {
     if (!currentUser) return;
-    const matchedUser = usersDB.find(u => u.username === currentUser.username);
-    if (!matchedUser) return;
-
-    matchedUser.chat = {
-        status: 'open',
-        messages: matchedUser.chat ? (matchedUser.chat.messages || []) : []
-    };
-    saveUserToDB(matchedUser);
-    renderChatView();
+    const u = usersDB.find(u => u.username === currentUser.username);
+    if (!u) return;
+    u.chat = { status: 'open', messages: [] };
+    saveUserToDB(u);
+    renderChat();
 }
 
-// Renderiza la vista de chat para el usuario (decide qué panel mostrar)
-function renderChatView() {
+// ---- USUARIO: enviar mensaje ----
+function sendMessage() {
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+
+    const u = usersDB.find(u => u.username === currentUser.username);
+    if (!u) return;
+
+    if (!u.chat || u.chat.status === 'closed') {
+        openNewChat();
+        return;
+    }
+
+    if (!u.chat.messages) u.chat.messages = [];
+    u.chat.messages.push({
+        sender: currentUser.username,
+        text: text,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isAdmin: false
+    });
+
+    saveUserToDB(u);
+    input.value = '';
+    renderChat();
+
+    // Notificar al admin
+    addNotification(
+        'Nuevo mensaje de ' + currentUser.username,
+        text,
+        'fa-comments',
+        'var(--gold-primary)',
+        "switchDashboardView('admin')"
+    );
+}
+
+// ---- USUARIO: renderizar la sección de soporte ----
+function renderChat() {
     if (!currentUser || currentUser.isAdmin) return;
 
-    const matchedUser = usersDB.find(u => u.username === currentUser.username);
+    const panelStart  = document.getElementById('chat-start-panel');
+    const panelActive = document.getElementById('chat-active-panel');
+    const panelClosed = document.getElementById('chat-closed-notice');
+    const badge       = document.getElementById('chat-status-badge');
+    if (!panelStart) return;
 
-    const startPanel     = document.getElementById('chat-start-panel');
-    const activePanel    = document.getElementById('chat-active-panel');
-    const closedNotice   = document.getElementById('chat-closed-notice');
-    const statusBadge    = document.getElementById('chat-status-badge');
+    const u = usersDB.find(u => u.username === currentUser.username);
 
-    if (!startPanel) return;
-
-    if (!matchedUser || !matchedUser.chat) {
-        // Sin chat iniciado nunca
-        startPanel.style.display = 'block';
-        activePanel.style.display = 'none';
-        closedNotice.style.display = 'none';
-        statusBadge.style.display = 'none';
+    // Sin chat nunca iniciado
+    if (!u || !u.chat) {
+        panelStart.style.display  = 'block';
+        panelActive.style.display = 'none';
+        panelClosed.style.display = 'none';
+        badge.style.display       = 'none';
         return;
     }
 
-    const chat = matchedUser.chat;
-
-    if (chat.status === 'closed') {
-        startPanel.style.display = 'none';
-        activePanel.style.display = 'none';
-        closedNotice.style.display = 'block';
-        statusBadge.style.display = 'inline-block';
-        statusBadge.style.background = 'rgba(255,77,79,0.15)';
-        statusBadge.style.color = 'var(--danger)';
-        statusBadge.style.border = '1px solid var(--danger)';
-        statusBadge.innerHTML = '<i class="fas fa-lock"></i> Cerrado';
+    // Chat cerrado por el admin
+    if (u.chat.status === 'closed') {
+        panelStart.style.display  = 'none';
+        panelActive.style.display = 'none';
+        panelClosed.style.display = 'block';
+        badge.style.display = 'inline-block';
+        badge.style.cssText += 'background:rgba(255,77,79,0.15);color:var(--danger);border:1px solid var(--danger);';
+        badge.innerHTML = '<i class="fas fa-lock"></i> Chat cerrado';
         return;
     }
 
-    // Chat abierto
-    startPanel.style.display = 'none';
-    activePanel.style.display = 'flex';
-    closedNotice.style.display = 'none';
-    statusBadge.style.display = 'inline-block';
-    statusBadge.style.background = 'rgba(82,196,26,0.15)';
-    statusBadge.style.color = 'var(--success)';
-    statusBadge.style.border = '1px solid var(--success)';
-    statusBadge.innerHTML = '<i class="fas fa-circle" style="font-size:0.6rem;"></i> En línea';
+    // Chat abierto — mostrar mensajes
+    panelStart.style.display  = 'none';
+    panelActive.style.display = 'flex';
+    panelClosed.style.display = 'none';
+    badge.style.display = 'inline-block';
+    badge.style.cssText += 'background:rgba(82,196,26,0.15);color:var(--success);border:1px solid var(--success);';
+    badge.innerHTML = '<i class="fas fa-circle" style="font-size:0.55rem;vertical-align:middle;margin-right:4px;"></i> En línea';
 
-    renderChatMessages(chat.messages || [], 'chat-messages-container', currentUser.username);
+    _renderMsgs(u.chat.messages || [], 'chat-messages-container', false);
 }
 
-// Renderiza mensajes en un contenedor dado
-function renderChatMessages(messages, containerId, myUsername) {
+// También se llama desde switchDashboardView
+function renderChatView() { renderChat(); }
+
+// ---- ADMIN: lista de conversaciones ----
+function renderAdminChatList() {
+    const listEl = document.getElementById('admin-chats-list');
+    const emptyMsg = document.getElementById('admin-no-chats-msg');
+    if (!listEl) return;
+
+    // Usuarios que tienen chat abierto (con mensajes)
+    const withChat = usersDB.filter(u => u.chat && u.chat.messages && u.chat.messages.length > 0);
+
+    // Limpiar tarjetas anteriores (no el mensaje vacío)
+    Array.from(listEl.children).forEach(c => { if (c.id !== 'admin-no-chats-msg') c.remove(); });
+
+    if (withChat.length === 0) {
+        emptyMsg.style.display = 'block';
+        return;
+    }
+    emptyMsg.style.display = 'none';
+
+    withChat.forEach(u => {
+        const last   = u.chat.messages[u.chat.messages.length - 1];
+        const isOpen = u.chat.status === 'open';
+        const active = adminChatTargetUsername === u.username;
+
+        const card = document.createElement('div');
+        card.style.cssText = `
+            padding:14px 18px; border-radius:10px; cursor:pointer;
+            border:1px solid ${active ? 'var(--gold-primary)' : 'var(--panel-border)'};
+            background:${active ? 'rgba(212,175,55,0.08)' : 'var(--panel-bg)'};
+            display:flex; align-items:center; gap:14px; transition:all 0.2s;
+        `;
+
+        card.innerHTML = `
+            <div style="width:10px;height:10px;border-radius:50%;flex-shrink:0;
+                background:${isOpen ? 'var(--success)' : 'var(--danger)'};
+                box-shadow:0 0 6px ${isOpen ? 'var(--success)' : 'var(--danger)'};"></div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;color:var(--gold-primary);">
+                    ${u.firstname ? u.firstname + ' ' + (u.lastname || '') : u.username}
+                    <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted);margin-left:6px;">@${u.username}</span>
+                </div>
+                <div style="font-size:0.82rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                    ${last ? (last.isAdmin ? '✉ Tú: ' : '') + last.text : 'Sin mensajes'}
+                </div>
+            </div>
+            <span style="font-size:0.72rem;color:var(--text-muted);white-space:nowrap;">${u.chat.messages.length} msg</span>
+        `;
+        card.onclick = () => adminOpenChat(u.username);
+        listEl.appendChild(card);
+    });
+
+    // Si el chat activo sigue abierto, refrescar sus mensajes
+    if (adminChatTargetUsername) adminRenderChatMessages();
+}
+
+// ---- ADMIN: abrir un chat ----
+function adminOpenChat(username) {
+    adminChatTargetUsername = username;
+
+    const panel = document.getElementById('admin-chat-reply-panel');
+    const nameEl = document.getElementById('admin-chat-target-name');
+    if (!panel || !nameEl) return;
+
+    const u = usersDB.find(u => u.username === username);
+    nameEl.innerText = u ? (u.firstname ? u.firstname + ' ' + (u.lastname || '') + ' (@' + username + ')' : username) : username;
+
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    adminRenderChatMessages();
+    renderAdminChatList();
+}
+
+// ---- ADMIN: renderizar mensajes del chat seleccionado ----
+function adminRenderChatMessages() {
+    if (!adminChatTargetUsername) return;
+    const u = usersDB.find(u => u.username === adminChatTargetUsername);
+    if (!u || !u.chat) return;
+    _renderMsgs(u.chat.messages || [], 'admin-chat-messages', true);
+}
+
+// ---- ADMIN: enviar mensaje ----
+function adminSendMessage() {
+    if (!adminChatTargetUsername) return;
+    const input = document.getElementById('admin-chat-input');
+    const text = input ? input.value.trim() : '';
+    if (!text) return;
+
+    const u = usersDB.find(u => u.username === adminChatTargetUsername);
+    if (!u) return;
+
+    if (!u.chat) u.chat = { status: 'open', messages: [] };
+    if (!u.chat.messages) u.chat.messages = [];
+
+    u.chat.messages.push({
+        sender: 'Admin',
+        text: text,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isAdmin: true
+    });
+    u.chat.status = 'open';
+
+    saveUserToDB(u);
+    input.value = '';
+    adminRenderChatMessages();
+}
+
+// ---- ADMIN: finalizar y limpiar chat ----
+function adminEndChat() {
+    if (!adminChatTargetUsername) return;
+
+    const u = usersDB.find(u => u.username === adminChatTargetUsername);
+    if (!u) return;
+
+    // Borrar completamente el chat
+    u.chat = { status: 'closed', messages: [] };
+    saveUserToDB(u);
+
+    // Ocultar panel de respuesta
+    const panel = document.getElementById('admin-chat-reply-panel');
+    if (panel) panel.style.display = 'none';
+
+    adminChatTargetUsername = null;
+    renderAdminChatList();
+}
+
+// ---- Función interna: renderizar burbujas de mensajes ----
+function _renderMsgs(messages, containerId, isAdminView) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
     if (!messages || messages.length === 0) {
-        container.innerHTML = '<p class="text-muted" style="text-align:center; padding:20px;">No hay mensajes aún. ¡Escribe algo!</p>';
+        container.innerHTML = `
+            <div style="text-align:center;padding:30px;color:var(--text-muted);">
+                <i class="fas fa-comments" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i>
+                Sin mensajes aún.
+            </div>`;
         return;
     }
 
     container.innerHTML = messages.map(m => {
-        const isMine = m.sender === myUsername && !m.isAdmin;
-        const isAdminMsg = m.isAdmin;
-        // Si soy el admin viendo un chat: los mensajes del admin son "míos" (derecha)
-        let cssClass = '';
-        if (myUsername === '__admin__') {
-            cssClass = isAdminMsg ? 'msg-user' : 'msg-admin';
-        } else {
-            cssClass = isMine ? 'msg-user' : 'msg-admin';
-        }
-        const senderLabel = isAdminMsg ? 'Soporte' : m.sender;
+        // En vista admin: los mensajes del admin van a la derecha
+        // En vista usuario: los mensajes del usuario van a la derecha
+        const isMine = isAdminView ? m.isAdmin : !m.isAdmin;
+        const label  = m.isAdmin ? 'Soporte' : m.sender;
         return `
-            <div class="msg ${cssClass}">
-                <span style="font-size:0.7rem; opacity:0.6; display:block; margin-bottom:3px;">${senderLabel}</span>
-                <p>${m.text}</p>
+            <div class="msg ${isMine ? 'msg-user' : 'msg-admin'}">
+                <span style="font-size:0.68rem;opacity:0.55;display:block;margin-bottom:2px;">${label}</span>
+                <p style="margin:0;">${m.text}</p>
                 <span class="msg-time">${m.time}</span>
-            </div>
-        `;
+            </div>`;
     }).join('');
     container.scrollTop = container.scrollHeight;
 }
 
-// Usuario envía mensaje
-function sendMessage() {
-    const input = document.getElementById('chat-input');
-    const message = input.value.trim();
-    if (!message) return;
-
-    const matchedUser = usersDB.find(u => u.username === currentUser.username);
-    if (!matchedUser || !matchedUser.chat || matchedUser.chat.status === 'closed') {
-        alert('El chat está cerrado. Abre uno nuevo para continuar.');
-        return;
-    }
-
-    if (!matchedUser.chat.messages) matchedUser.chat.messages = [];
-    matchedUser.chat.messages.push({
-        sender: currentUser.username,
-        text: message,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isAdmin: false
-    });
-    matchedUser.chat.status = 'open';
-
-    saveUserToDB(matchedUser);
-    input.value = '';
-    renderChatView();
-
-    // Notificación interna para que el admin sepa
-    addNotification(
-        "Nuevo Mensaje de Soporte",
-        `<strong>${currentUser.username}</strong>: ${message}`,
-        "fa-comments",
-        "var(--gold-primary)",
-        `switchDashboardView('admin')`
-    );
-}
-
-// Llama a renderChatView cuando entramos a la sección (ya existía esta llamada en switchDashboardView)
-function renderChat() {
-    renderChatView();
-}
-
-// --- Admin: gestión de chats ---
-
-// Renderiza la lista de chats en el panel admin
-function renderAdminChatList() {
-    const listEl = document.getElementById('admin-chats-list');
-    const noChatsMsg = document.getElementById('admin-no-chats-msg');
-    if (!listEl) return;
-
-    const usersWithChat = usersDB.filter(u => u.chat && u.chat.messages && u.chat.messages.length > 0);
-
-    if (usersWithChat.length === 0) {
-        noChatsMsg.style.display = 'block';
-        // Limpiar tarjetas anteriores
-        Array.from(listEl.children).forEach(child => {
-            if (child !== noChatsMsg) child.remove();
-        });
-        return;
-    }
-
-    noChatsMsg.style.display = 'none';
-    // Limpiar tarjetas anteriores
-    Array.from(listEl.children).forEach(child => {
-        if (child !== noChatsMsg) child.remove();
-    });
-
-    usersWithChat.forEach(u => {
-        const chat = u.chat;
-        const lastMsg = chat.messages[chat.messages.length - 1];
-        const isOpen = chat.status === 'open';
-        const isActive = adminChatTargetUsername === u.username;
-
-        const card = document.createElement('div');
-        card.style.cssText = `
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 18px; border-radius: 8px; cursor: pointer;
-            border: 1px solid ${isActive ? 'var(--gold-primary)' : 'var(--panel-border)'};
-            background: ${isActive ? 'rgba(212,175,55,0.1)' : 'var(--panel-bg)'};
-            transition: all 0.2s;
-        `;
-
-        const statusDot = isOpen
-            ? `<span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block;margin-right:6px;"></span>`
-            : `<span style="width:8px;height:8px;border-radius:50%;background:var(--danger);display:inline-block;margin-right:6px;"></span>`;
-
-        card.innerHTML = `
-            <div>
-                <div style="font-weight:600; color:var(--gold-primary); margin-bottom:4px;">
-                    ${statusDot}<i class="fas fa-user" style="margin-right:6px;"></i>${u.username}
-                    <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400; margin-left:8px;">${isOpen ? 'Abierto' : 'Cerrado'}</span>
-                </div>
-                <div style="font-size:0.85rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:300px;">
-                    ${lastMsg ? `${lastMsg.isAdmin ? 'Tú' : lastMsg.sender}: ${lastMsg.text}` : 'Sin mensajes'}
-                </div>
-            </div>
-            <span style="font-size:0.75rem; color:var(--text-muted);">${chat.messages.length} msg</span>
-        `;
-
-        card.onclick = () => adminOpenChat(u.username);
-        listEl.appendChild(card);
-    });
-}
-
-// Admin abre el chat de un usuario
-function adminOpenChat(username) {
-    adminChatTargetUsername = username;
-    const replyPanel = document.getElementById('admin-chat-reply-panel');
-    const targetNameEl = document.getElementById('admin-chat-target-name');
-    if (!replyPanel || !targetNameEl) return;
-
-    targetNameEl.innerText = username;
-    replyPanel.style.display = 'block';
-    replyPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    adminRenderChatMessages();
-    renderAdminChatList(); // Refrescar para marcar activo
-}
-
-// Renderiza los mensajes del chat seleccionado en el panel admin
-function adminRenderChatMessages() {
-    if (!adminChatTargetUsername) return;
-    const targetUser = usersDB.find(u => u.username === adminChatTargetUsername);
-    if (!targetUser || !targetUser.chat) return;
-
-    renderChatMessages(targetUser.chat.messages || [], 'admin-chat-messages', '__admin__');
-}
-
-// Admin envía mensaje al usuario
-function adminSendMessage() {
-    if (!adminChatTargetUsername) return;
-    const input = document.getElementById('admin-chat-input');
-    const message = input.value.trim();
-    if (!message) return;
-
-    const targetUser = usersDB.find(u => u.username === adminChatTargetUsername);
-    if (!targetUser) return;
-
-    if (!targetUser.chat) targetUser.chat = { status: 'open', messages: [] };
-    if (!targetUser.chat.messages) targetUser.chat.messages = [];
-
-    targetUser.chat.messages.push({
-        sender: 'Admin',
-        text: message,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isAdmin: true
-    });
-    targetUser.chat.status = 'open';
-
-    saveUserToDB(targetUser);
-    input.value = '';
-    adminRenderChatMessages();
-}
-
-// Admin finaliza el chat
-function adminEndChat() {
-    if (!adminChatTargetUsername) return;
-    if (!confirm(`¿Finalizar el chat con ${adminChatTargetUsername}? El usuario verá que fue cerrado y podrá abrir uno nuevo.`)) return;
-
-    const targetUser = usersDB.find(u => u.username === adminChatTargetUsername);
-    if (!targetUser || !targetUser.chat) return;
-
-    targetUser.chat.status = 'closed';
-    saveUserToDB(targetUser);
-
-    adminChatTargetUsername = null;
-    document.getElementById('admin-chat-reply-panel').style.display = 'none';
-    renderAdminChatList();
-}
-
-// endChat ya no se usa directamente desde el usuario, pero lo mantenemos por compatibilidad
-function endChat() {
-    openNewChat();
-}
+// Compatibilidad con llamadas antiguas
+function endChat() { openNewChat(); }
 
 // --- History System Logic ---
 function switchHistoryTab(tabName) {
@@ -2290,106 +2273,86 @@ function toggleFloatChat() {
 
 function renderFloatChat() {
     if (!currentUser) return;
-    const matchedUser = usersDB.find(u => u.username === currentUser.username);
-    const messagesEl   = document.getElementById('float-chat-messages');
-    const inputArea    = document.getElementById('float-chat-input-area');
-    const closedEl     = document.getElementById('float-chat-closed');
-    const statusText   = document.getElementById('float-chat-status-text');
-
+    const u = usersDB.find(u => u.username === currentUser.username);
+    const messagesEl = document.getElementById('float-chat-messages');
+    const inputArea  = document.getElementById('float-chat-input-area');
+    const closedEl   = document.getElementById('float-chat-closed');
+    const statusText = document.getElementById('float-chat-status-text');
     if (!messagesEl) return;
 
-    if (!matchedUser || !matchedUser.chat) {
-        // Sin chat iniciado
-        messagesEl.style.display = 'flex';
-        if (inputArea) inputArea.style.display = 'flex';
-        if (closedEl) closedEl.style.display = 'none';
+    const show = (el, v) => { if (el) el.style.display = v; };
+
+    if (!u || !u.chat) {
+        show(messagesEl, 'flex'); show(inputArea, 'flex'); show(closedEl, 'none');
         if (statusText) statusText.textContent = 'Escríbenos, te respondemos pronto';
-        messagesEl.innerHTML = `
-            <div style="text-align:center; margin:auto; padding:20px;">
-                <i class="fas fa-comments" style="font-size:2.5rem; color:var(--gold-primary); opacity:0.5;"></i>
-                <p style="color:var(--text-muted); font-size:0.85rem; margin-top:10px;">Envíanos un mensaje y el administrador te responderá.</p>
-            </div>`;
+        messagesEl.innerHTML = `<div style="text-align:center;margin:auto;padding:20px;color:var(--text-muted);">
+            <i class="fas fa-comments" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i>
+            Envíanos un mensaje.</div>`;
         return;
     }
 
-    const chat = matchedUser.chat;
-
-    if (chat.status === 'closed') {
-        messagesEl.style.display = 'none';
-        if (inputArea) inputArea.style.display = 'none';
-        if (closedEl) closedEl.style.display = 'block';
+    if (u.chat.status === 'closed') {
+        show(messagesEl, 'none'); show(inputArea, 'none'); show(closedEl, 'block');
         if (statusText) statusText.textContent = 'Chat cerrado';
         return;
     }
 
-    // Chat abierto
-    messagesEl.style.display = 'flex';
-    if (inputArea) inputArea.style.display = 'flex';
-    if (closedEl) closedEl.style.display = 'none';
+    show(messagesEl, 'flex'); show(inputArea, 'flex'); show(closedEl, 'none');
     if (statusText) statusText.textContent = 'En línea — te respondemos pronto';
 
-    const msgs = chat.messages || [];
+    const msgs = u.chat.messages || [];
     if (msgs.length === 0) {
-        messagesEl.innerHTML = `
-            <div style="text-align:center; margin:auto; padding:20px;">
-                <i class="fas fa-comments" style="font-size:2.5rem; color:var(--gold-primary); opacity:0.5;"></i>
-                <p style="color:var(--text-muted); font-size:0.85rem; margin-top:10px;">Envíanos un mensaje.</p>
-            </div>`;
+        messagesEl.innerHTML = `<div style="text-align:center;margin:auto;padding:20px;color:var(--text-muted);">
+            <i class="fas fa-comments" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i>
+            Envíanos un mensaje.</div>`;
         return;
     }
 
-    messagesEl.innerHTML = msgs.map(m => {
-        const isMine = !m.isAdmin;
-        return `
-            <div class="float-msg ${isMine ? 'float-msg-user' : 'float-msg-admin'}">
-                <span class="float-msg-sender">${m.isAdmin ? 'Soporte' : m.sender}</span>
-                ${m.text}
-                <span class="float-msg-time">${m.time}</span>
-            </div>`;
-    }).join('');
+    messagesEl.innerHTML = msgs.map(m => `
+        <div class="float-msg ${m.isAdmin ? 'float-msg-admin' : 'float-msg-user'}">
+            <span class="float-msg-sender">${m.isAdmin ? 'Soporte' : m.sender}</span>
+            ${m.text}
+            <span class="float-msg-time">${m.time}</span>
+        </div>`).join('');
     messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
 function floatChatSend() {
     const input = document.getElementById('float-chat-input');
-    const message = input ? input.value.trim() : '';
-    if (!message) return;
+    const text = input ? input.value.trim() : '';
+    if (!text) return;
 
-    const matchedUser = usersDB.find(u => u.username === currentUser.username);
-    if (!matchedUser) return;
+    const u = usersDB.find(u => u.username === currentUser.username);
+    if (!u) return;
 
-    // Auto-abrir chat si no existe
-    if (!matchedUser.chat || matchedUser.chat.status === 'closed') {
-        matchedUser.chat = { status: 'open', messages: [] };
+    if (!u.chat || u.chat.status === 'closed') {
+        u.chat = { status: 'open', messages: [] };
     }
-    if (!matchedUser.chat.messages) matchedUser.chat.messages = [];
+    if (!u.chat.messages) u.chat.messages = [];
 
-    matchedUser.chat.messages.push({
+    u.chat.messages.push({
         sender: currentUser.username,
-        text: message,
+        text: text,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isAdmin: false
     });
-    matchedUser.chat.status = 'open';
+    u.chat.status = 'open';
 
-    saveUserToDB(matchedUser);
+    saveUserToDB(u);
     input.value = '';
     renderFloatChat();
 
     addNotification(
-        'Nuevo Mensaje de Soporte',
-        `<strong>${currentUser.username}</strong>: ${message}`,
+        'Nuevo mensaje de ' + currentUser.username,
+        text,
         'fa-comments',
         'var(--gold-primary)',
-        `switchDashboardView('admin')`
+        "switchDashboardView('admin')"
     );
 }
 
-// Mostrar badge en el botón flotante cuando llega una respuesta del admin
 function notifyFloatChatBadge() {
     if (floatChatOpen) return;
     const badge = document.getElementById('float-chat-badge');
-    if (badge) {
-        badge.style.display = 'flex';
-    }
+    if (badge) badge.style.display = 'flex';
 }
