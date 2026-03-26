@@ -2116,6 +2116,81 @@ function adminResetUser() {
     }
 }
 
+async function adminTriggerGlobalPayout() {
+    if (!currentUser || !currentUser.isAdmin) return;
+
+    // Confirmación de seguridad
+    if (!confirm("⚠️ ¿EJECUTAR PAGO GLOBAL AHORA?\n\n- Se pagará 1.25% a todos los usuarios con inversiones activas.\n- Se verificará que no hayan cobrado ya el día de hoy.\n- Esta acción es IRREVERSIBLE.")) return;
+
+    const drTime = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Santo_Domingo"}));
+    const todayStr = `${drTime.getFullYear()}-${drTime.getMonth() + 1}-${drTime.getDate()}`;
+    const w = drTime.getDay();
+
+    if (w === 0 || w === 6) {
+        alert("¡Es fin de semana! Según las reglas, no se pagan intereses los sábados ni domingos.");
+        return;
+    }
+
+    let paidCount = 0;
+    let totalPaidAmount = 0;
+
+    for (let u of usersDB) {
+        if (!u.investments || u.investments.length === 0) continue;
+
+        let userUpdated = false;
+        let amountToAdd = 0;
+
+        u.investments.forEach(inv => {
+            if (!inv.active) return;
+            
+            // Evitar pago doble el mismo día
+            if (inv.lastPaidDateStr === todayStr) return;
+
+            const dailyPct = 0.0125; // 1.25% Fijo
+            let gain = inv.amount * dailyPct;
+            const maxGain = inv.amount * 2;
+            const currentGain = inv.earnings || 0;
+
+            if (currentGain >= maxGain) {
+                inv.active = false;
+                userUpdated = true;
+                return;
+            }
+
+            if (currentGain + gain > maxGain) gain = maxGain - currentGain;
+
+            inv.earnings = currentGain + gain;
+            inv.lastPaidDateStr = todayStr;
+            amountToAdd += gain;
+            userUpdated = true;
+        });
+
+        if (userUpdated && amountToAdd > 0) {
+            u.balance = (u.balance || 0) + amountToAdd;
+            u.totalHistoricalEarnings = (u.totalHistoricalEarnings || 0) + amountToAdd;
+            u.earnings = u.totalHistoricalEarnings;
+
+            if (!u.bonusHistory) u.bonusHistory = [];
+            u.bonusHistory.push({
+                from: "Fondo de Inversión (Pago Manual Admin)",
+                amount: amountToAdd,
+                date: new Date().toISOString()
+            });
+
+            saveUserToDB(u);
+            paidCount++;
+            totalPaidAmount += amountToAdd;
+        }
+    }
+
+    if (paidCount > 0) {
+        alert(`🎯 ¡ÉXITO!\n\nSe han realizado pagos a ${paidCount} inversionistas.\nTotal distribuido: $${totalPaidAmount.toFixed(2)} USD.`);
+        if (currentlyEditingUsername) adminSearchUser(); // Refrescar si estamos viendo a alguien
+    } else {
+        alert("No se realizaron pagos. (Es posible que todos ya hayan cobrado hoy o no tengan inversiones activas).");
+    }
+}
+
 function renderAdminUserList() {
     renderAdminChatList(); // Actualizar lista de chats también
     const tBody = document.getElementById('admin-all-users-tbody');

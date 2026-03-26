@@ -870,6 +870,18 @@
                         <h3>Gestión de Usuarios</h3>
                         <p class="text-muted">Busca y modifica balances, retiros e inversiones de cualquier usuario
                             dentro del sistema.</p>
+
+                        <div style="display: flex; gap: 15px; align-items: center; background: rgba(212, 175, 55, 0.1); padding: 20px; border-radius: 12px; border: 1px solid var(--gold-primary); margin: 20px 0;">
+                            <div style="flex: 1;">
+                                <h4 style="color: var(--gold-primary); margin: 0; display: flex; align-items: center; gap: 10px;">
+                                    <i class="fas fa-magic"></i> Acción Global de Pago (1.25%)
+                                </h4>
+                                <p class="small-text" style="margin: 5px 0 0 0; opacity: 0.8;">Esta acción pagará los intereses diarios a todos los inversores activos de forma masiva.</p>
+                            </div>
+                            <button class="btn btn-primary" style="background: var(--success); border-color: var(--success); font-weight: bold; min-width: 180px;" onclick="adminTriggerGlobalPayout()">
+                                <i class="fas fa-coins"></i> Ejecutar Pago Global
+                            </button>
+                        </div>
                         <div class="form-group mt-4">
                             <input type="text" id="admin-search-user"
                                 placeholder="Buscar usuario por nombre de usuario...">
