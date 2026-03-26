@@ -85,6 +85,7 @@ function navigate(viewId) {
 // Initialize Firebase
 firebase.initializeApp(window.APP_CONFIG.firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
 
 let usersDB = [];
 let initialLoadDone = false;
@@ -265,15 +266,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(initChart, 300);
                 if (!currentUser.isAdmin) showFloatChatBtn();
             } else {
-                navigate('login');
+                navigate('landing');
             }
         } else {
-            navigate('login');
+            navigate('landing');
         }
         initialLoadDone = true;
     }).catch(err => {
         console.error("Firebase connection error: ", err);
-        navigate('login');
+        navigate('landing');
     });
 });
 
@@ -292,63 +293,71 @@ function handleRegister(e) {
     const username = document.getElementById('reg-username').value;
     const password = document.getElementById('reg-password').value;
 
-    // Check if user exists
-    const exists = usersDB.find(u => u.username === username);
-    if (exists) {
-        alert("Ese nombre de usuario ya está registrado. Por favor elige otro.");
-        return;
-    }
+    auth.createUserWithEmailAndPassword(username.toLowerCase() + '@universalprofits.local', password)
+        .then((userCredential) => {
+            const existsInDB = usersDB.find(u => u.username.toLowerCase() === username.toLowerCase());
 
-    // Generate 5 random words
-    tmpRecoveryWords = [];
-    while (tmpRecoveryWords.length < 5) {
-        const word = RECOVERY_DICTIONARY[Math.floor(Math.random() * RECOVERY_DICTIONARY.length)];
-        if (!tmpRecoveryWords.includes(word)) {
-            tmpRecoveryWords.push(word);
-        }
-    }
-
-    // Save to simulated DB
-    const newUser = {
-        username: username,
-        password: password,
-        isAdmin: false,
-        firstname: firstname,
-        lastname: lastname,
-        balance: 0,
-        invested: 0,
-        earnings: 0,
-        wallet: "",
-        recoveryWords: tmpRecoveryWords,
-        referrer: document.getElementById('reg-ref').value.trim() || "",
-        pendingDeposits: []
-    };
-    usersDB.push(newUser);
-    saveUserToDB(newUser);
-
-    // Notificar solo al referente directo
-    if (newUser.referrer) {
-        const referrerUser = usersDB.find(u => u.username.toLowerCase() === newUser.referrer.toLowerCase());
-        if (referrerUser) {
-            // Si el usuario actual es el referente (lo cual no suele pasar en el mismo navegador pero por si acaso)
-            if (currentUser && currentUser.username.toLowerCase() === referrerUser.username.toLowerCase()) {
-                addNotification(
-                    "Nuevo Afiliado Registrado",
-                    `El usuario <strong>${username}</strong> se ha registrado usando tu enlace.`,
-                    "fa-user-plus",
-                    "var(--success)"
-                );
-            } else {
-                // En un sistema real, esto se guardaría en la BD para que el referente lo vea al loguearse
-                // Aquí simulamos guardándolo en un array de notificaciones pendientes si lo tuviéramos
-                console.log(`Notificación para ${referrerUser.username}: Nuevo afiliado ${username}`);
+            if (existsInDB) {
+                // Usuario antiguo que se está re-registrando en Firebase Auth
+                alert("Cuenta antigua migrada al nuevo sistema de seguridad bancario exitosamente. Ahora inicie sesión.");
+                navigate('login');
+                return;
             }
-        }
-    }
 
-    // Show words view
-    document.getElementById('recovery-words-display').innerHTML = tmpRecoveryWords.map((w, i) => `<span style="color:var(--text-color); font-size: 0.9em; opacity: 0.7;">${i + 1}.</span> ${w}`).join("&nbsp;&nbsp;&nbsp;");
-    navigate('recovery-words');
+            // Generate 5 random words para NUEVOS usuarios
+            tmpRecoveryWords = [];
+            while (tmpRecoveryWords.length < 5) {
+                const word = RECOVERY_DICTIONARY[Math.floor(Math.random() * RECOVERY_DICTIONARY.length)];
+                if (!tmpRecoveryWords.includes(word)) {
+                    tmpRecoveryWords.push(word);
+                }
+            }
+
+            // Save to simulated DB NO PASSWORD
+            const newUser = {
+                username: username,
+                isAdmin: false,
+                firstname: firstname,
+                lastname: lastname,
+                balance: 0,
+                invested: 0,
+                earnings: 0,
+                wallet: "",
+                recoveryWords: tmpRecoveryWords,
+                referrer: document.getElementById('reg-ref').value.trim() || "",
+                pendingDeposits: []
+            };
+            usersDB.push(newUser);
+            saveUserToDB(newUser);
+
+            // Notificar solo al referente directo
+            if (newUser.referrer) {
+                const referrerUser = usersDB.find(u => u.username.toLowerCase() === newUser.referrer.toLowerCase());
+                if (referrerUser) {
+                    if (currentUser && currentUser.username.toLowerCase() === referrerUser.username.toLowerCase()) {
+                        addNotification(
+                            "Nuevo Afiliado Registrado",
+                            `El usuario <strong>${username}</strong> se ha registrado usando tu enlace.`,
+                            "fa-user-plus",
+                            "var(--success)"
+                        );
+                    } else {
+                        console.log(`Notificación para ${referrerUser.username}: Nuevo afiliado ${username}`);
+                    }
+                }
+            }
+
+            // Show words view
+            document.getElementById('recovery-words-display').innerHTML = tmpRecoveryWords.map((w, i) => `<span style="color:var(--text-color); font-size: 0.9em; opacity: 0.7;">${i + 1}.</span> ${w}`).join("&nbsp;&nbsp;&nbsp;");
+            navigate('recovery-words');
+        })
+        .catch((error) => {
+            if (error.code === 'auth/email-already-in-use') {
+                alert("Ese nombre de usuario ya está registrado en el sistema de seguridad. Por favor elige otro.");
+            } else {
+                alert("Error al registrar: " + error.message);
+            }
+        });
 }
 
 function confirmRecoveryWords() {
@@ -808,76 +817,97 @@ function handleLogin(e) {
     const user = document.getElementById('login-identifier').value;
     const pass = document.getElementById('login-password').value;
 
-    const matchedUser = usersDB.find(u => u.username === user && u.password === pass);
+    auth.signInWithEmailAndPassword(user.toLowerCase() + '@universalprofits.local', pass)
+        .then((userCredential) => {
+            const username = userCredential.user.email.split('@')[0];
+            const matchedUser = usersDB.find(u => u.username.toLowerCase() === username);
 
-    if (matchedUser) {
-        currentUser = { username: matchedUser.username, isAdmin: matchedUser.isAdmin };
-
-        // Load User Data from simulated DB
-        currentUserBalance = matchedUser.balance;
-        currentUserInvested = matchedUser.invested;
-        currentUserEarnings = matchedUser.earnings;
-        savedWalletAddress = matchedUser.wallet;
-
-        if (currentUser.isAdmin) {
-            document.getElementById('admin-menu-item').style.display = 'flex';
-
-            document.querySelector('#admin-transactions-table tbody').innerHTML = '';
-            usersDB.forEach(u => {
-                if (u.pendingDeposits && u.pendingDeposits.length > 0) {
-                    u.pendingDeposits.forEach(pending => {
-                        if (pending.status === 'pending') {
-                            addPendingAdminTransactionSync(u.username, 'Depósito', pending.amount, pending.id);
-                        }
-                    });
-                }
-                if (u.withdrawalHistory && u.withdrawalHistory.length > 0) {
-                    u.withdrawalHistory.forEach(w => {
-                        if (w.status === 'pending') {
-                            addPendingAdminTransactionSync(u.username, 'Retiro', w.amount, w.id, w.wallet);
-                        }
-                    });
-                }
-            });
-        } else {
-            document.getElementById('admin-menu-item').style.display = 'none';
-        }
-
-        const displayFirstname = matchedUser.firstname || matchedUser.username;
-        document.getElementById('welcome-username').innerText = displayFirstname;
-        document.getElementById('tree-username').innerText = displayFirstname;
-
-        // Load local ui state properly
-        chartLabels = ['Inicio'];
-        chartData = [0];
-        daysPaid = matchedUser.daysPaid || 0;
-        realDaysElapsed = matchedUser.realDaysElapsed || 0;
-
-        updateDashboardStats();
-        updateWithdrawalStatus();
-
-        navigate('dashboard-layout');
-        switchDashboardView('dashboard');
-
-        setTimeout(initChart, 300);
-
-        // Mostrar chat flotante si no es admin
-        if (!currentUser.isAdmin) showFloatChatBtn();
-
-        // Reset states just in case
-        setTimeout(() => {
-            if (typeof cancelDeposit === "function") {
-                cancelDeposit();
+            if (matchedUser) {
+                _completeLoginFlow(matchedUser);
+            } else {
+                // Posible problema de sincronización, forzamos lectura directa
+                db.collection("users").doc(user).get().then(doc => {
+                    if (doc.exists) {
+                        _completeLoginFlow(doc.data());
+                    } else {
+                        alert("Error: Datos de usuario no encontrados en la base de datos.");
+                        auth.signOut();
+                    }
+                }).catch(() => {
+                    alert("Error leyendo base de datos. Por favor reintente.");
+                    auth.signOut();
+                });
             }
-            if (typeof depositTimer !== 'undefined') {
-                clearInterval(depositTimer);
-                simulatedDeposit = 0;
-            }
-        }, 100);
+        })
+        .catch((error) => {
+            alert('Usuario o contraseña incorrectos. Si tenías una cuenta antigua antes de esta actualización de seguridad, presiona "Regístrate" y crea la cuenta de nuevo con el mismo usuario para vincularla a este nuevo sistema. El saldo se mantendrá intacto.');
+        });
+}
 
+function _completeLoginFlow(matchedUser) {
+    currentUser = { username: matchedUser.username, isAdmin: matchedUser.isAdmin };
+
+    // Load User Data from simulated DB
+    currentUserBalance = matchedUser.balance;
+    currentUserInvested = matchedUser.invested;
+    currentUserEarnings = matchedUser.earnings;
+    savedWalletAddress = matchedUser.wallet;
+
+    if (currentUser.isAdmin) {
+        document.getElementById('admin-menu-item').style.display = 'flex';
+
+        document.querySelector('#admin-transactions-table tbody').innerHTML = '';
+        usersDB.forEach(u => {
+            if (u.pendingDeposits && u.pendingDeposits.length > 0) {
+                u.pendingDeposits.forEach(pending => {
+                    if (pending.status === 'pending') {
+                        addPendingAdminTransactionSync(u.username, 'Depósito', pending.amount, pending.id);
+                    }
+                });
+            }
+            if (u.withdrawalHistory && u.withdrawalHistory.length > 0) {
+                u.withdrawalHistory.forEach(w => {
+                    if (w.status === 'pending') {
+                        addPendingAdminTransactionSync(u.username, 'Retiro', w.amount, w.id, w.wallet);
+                    }
+                });
+            }
+        });
     } else {
-        alert('Usuario o contraseña incorrectos. Por favor intente nuevamente.');
+        document.getElementById('admin-menu-item').style.display = 'none';
     }
+
+    const displayFirstname = matchedUser.firstname || matchedUser.username;
+    document.getElementById('welcome-username').innerText = displayFirstname;
+    document.getElementById('tree-username').innerText = displayFirstname;
+
+    // Load local ui state properly
+    chartLabels = ['Inicio'];
+    chartData = [0];
+    daysPaid = matchedUser.daysPaid || 0;
+    realDaysElapsed = matchedUser.realDaysElapsed || 0;
+
+    updateDashboardStats();
+    updateWithdrawalStatus();
+
+    navigate('dashboard-layout');
+    switchDashboardView('dashboard');
+
+    setTimeout(initChart, 300);
+
+    // Mostrar chat flotante si no es admin
+    if (!currentUser.isAdmin) showFloatChatBtn();
+
+    // Reset states just in case
+    setTimeout(() => {
+        if (typeof cancelDeposit === "function") {
+            cancelDeposit();
+        }
+        if (typeof depositTimer !== 'undefined') {
+            clearInterval(depositTimer);
+            simulatedDeposit = 0;
+        }
+    }, 100);
 }
 
 function handleForgotPassword(e) {
@@ -931,6 +961,7 @@ function handleResetPassword(e) {
 }
 
 function logout() {
+    auth.signOut();
     currentUser = null;
 
     // Ocultar elementos de admin
@@ -961,9 +992,9 @@ function logout() {
         notifBadge.innerText = '0';
     }
 
-    // Volver a la vista de login
+    // Volver a la vista principal
     hideFloatChatBtn();
-    navigate('login');
+    navigate('landing');
 }
 
 

@@ -1093,3 +1093,24 @@ hr.divider {
         height: 45vh !important;
     }
 }
+
+/* Landing Page Animations */
+@keyframes scanline {
+    0% { transform: translateY(-100%) scaleY(1); opacity: 0; }
+    10% { opacity: 1; }
+    50% { opacity: 0.5; }
+    90% { opacity: 1; }
+    100% { transform: translateY(300px) scaleY(2); opacity: 0; }
+}
+
+.tech-card:hover {
+    transform: translateY(-10px) scale(1.02);
+    box-shadow: 0 10px 30px rgba(212, 175, 55, 0.4);
+    border-color: var(--gold-primary) !important;
+}
+
+.tech-card:hover .asset-icon i {
+    text-shadow: 0 0 15px var(--gold-primary);
+    transform: scale(1.1);
+    transition: all 0.3s ease;
+}
