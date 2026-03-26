@@ -200,21 +200,18 @@ setInterval(saveLocalDashboardState, 1000);
 
 // Automatic system checker for properties
 setInterval(() => {
-    if (currentUser && currentUser.isAdmin) {
+    if (currentUser) {
         let changed = false;
         usersDB.forEach(u => {
-            if (applyAutomaticProfits(u)) {
-                saveUserToDB(u);
+            if (recalculateUserFinances(u)) {
                 changed = true;
             }
+            if (applyAutomaticProfits(u)) {
+                changed = true;
+            }
+            if (changed) saveUserToDB(u);
         });
         if (changed) updateDashboardStats();
-    } else if (currentUser) {
-        const u = usersDB.find(u => u.username === currentUser.username);
-        if (u && applyAutomaticProfits(u)) {
-            saveUserToDB(u);
-            updateDashboardStats();
-        }
     }
 }, 10000); // Check every 10 seconds for real-time magic
 
@@ -566,6 +563,78 @@ function updateChart(label, value) {
     growthChartInstance.update();
 }
 
+function recalculateUserFinances(matchedUser) {
+    if (matchedUser.isRecalculatedFromStart) return false;
+    
+    let totalEarnings = 0;
+    matchedUser.investments.forEach((inv) => {
+        let invDateStr = inv.date;
+        if (!invDateStr) {
+            let ts = parseInt(inv.id.split('_')[1]);
+            if (!isNaN(ts) && ts > 1000000) invDateStr = new Date(ts).toISOString();
+            else {
+                let d = new Date();
+                d.setDate(d.getDate() - (matchedUser.realDaysElapsed || 0));
+                invDateStr = d.toISOString();
+            }
+            inv.date = invDateStr;
+        }
+        
+        // Count exact weekdays from invDate to today
+        let invDate = new Date(new Date(invDateStr).toLocaleString("en-US", {timeZone: "America/Santo_Domingo"}));
+        invDate = new Date(invDate.getFullYear(), invDate.getMonth(), invDate.getDate());
+        let drTime = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Santo_Domingo"}));
+        let today = new Date(drTime.getFullYear(), drTime.getMonth(), drTime.getDate());
+        
+        let maxEarnings = inv.amount * 2;
+        let dailyPct = inv.dailyPct ? (inv.dailyPct / 100) : (inv.amount < 600 ? 0.0080 : (inv.amount < 10000 ? 0.0110 : 0.0180));
+        let earningsPerDay = inv.amount * dailyPct;
+        
+        let earned = 0;
+        let ds = new Date(invDate.getTime() + 86400000); // starts the next day
+        
+        while(ds.getTime() <= today.getTime() && earned < maxEarnings) {
+            if (ds.getTime() === today.getTime() && drTime.getHours() < 18) {
+                break; // not 6 PM yet
+            }
+            let w = ds.getDay();
+            if (w !== 0 && w !== 6) {
+                earned += earningsPerDay;
+            }
+            ds = new Date(ds.getFullYear(), ds.getMonth(), ds.getDate() + 1);
+        }
+        if (earned > maxEarnings) earned = maxEarnings;
+        
+        // Asignar ganancia matématica real al centavo
+        inv.earnings = earned;
+        inv.lastPaidDateStr = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+        if (earned >= maxEarnings) inv.active = false;
+        
+        totalEarnings += earned;
+    });
+
+    let totalBonus = 0;
+    if (matchedUser.bonusHistory) {
+        matchedUser.bonusHistory.forEach(b => totalBonus += b.amount);
+    }
+    
+    let totalWithdrawals = 0;
+    if (matchedUser.withdrawalHistory) {
+        matchedUser.withdrawalHistory.forEach(w => {
+            totalWithdrawals += w.amount;
+        });
+    }
+    
+    matchedUser.totalHistoricalEarnings = totalEarnings + totalBonus;
+    matchedUser.earnings = matchedUser.totalHistoricalEarnings;
+    
+    matchedUser.balance = matchedUser.totalHistoricalEarnings - totalWithdrawals;
+    if (matchedUser.balance < 0) matchedUser.balance = 0;
+    
+    matchedUser.isRecalculatedFromStart = true;
+    return true;
+}
+
 function applyAutomaticProfits(matchedUser) {
     if (!matchedUser || !matchedUser.investments) return false;
     
@@ -587,7 +656,6 @@ function applyAutomaticProfits(matchedUser) {
         let invDateObj = new Date(new Date(invDateStr).toLocaleString("en-US", {timeZone: "America/Santo_Domingo"}));
         
         if (!inv.lastPaidDateStr) {
-            // Assume lastPaid was the day the investment was made, so it pays the next day
             inv.lastPaidDateStr = `${invDateObj.getFullYear()}-${invDateObj.getMonth() + 1}-${invDateObj.getDate()}`;
         }
         
