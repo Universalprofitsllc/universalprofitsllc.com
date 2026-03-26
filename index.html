@@ -25,108 +25,108 @@
         <!-- Welcome View Removed -->
 
         <!-- Landing Home View -->
-        <section id="view-landing" class="view active" style="min-height: 100vh; position: relative; flex-direction: column; background: url('trading_bg.png') no-repeat center center fixed; background-size: cover; overflow-y: auto;">
+        <section id="view-landing" class="view active landing-view">
             <!-- Dark Overlay -->
-            <div style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(5,5,5,0.85); z-index: 0; position: fixed;"></div>
+            <div class="landing-overlay"></div>
             
             <!-- Content -->
-            <div style="position: relative; z-index: 10; width: 100%;">
-                <header class="landing-header" style="display: flex; justify-content: space-between; align-items: center; padding: 25px 50px; background: rgba(0,0,0,0.6); backdrop-filter: blur(15px); border-bottom: 1px solid rgba(212,175,55,0.2);">
-                    <div class="landing-logo" style="display: flex; align-items: center;">
-                        <img src="logos/logo_luxury_crest_1773454223151.png" alt="UP Logo" style="height: 50px; margin-right: 15px;">
-                        <span style="font-family: 'Cinzel', serif; font-size: 1.8rem; font-weight: bold; letter-spacing: 2px;">UNIVERSAL <span class="gold">PROFITS</span></span>
+            <div class="landing-content">
+                <header class="landing-header">
+                    <div class="landing-logo">
+                        <img src="logos/logo_luxury_crest_1773454223151.png" alt="UP Logo">
+                        <span>UNIVERSAL <span class="gold">PROFITS</span></span>
                     </div>
-                    <div class="landing-actions" style="display: flex; gap: 20px;">
-                        <button class="btn btn-outline" onclick="navigate('login')" style="padding: 12px 30px; font-size: 1.1rem;"><i class="fas fa-sign-in-alt"></i> Iniciar Sesión</button>
-                        <button class="btn btn-primary" onclick="navigate('register')" style="padding: 12px 30px; font-size: 1.1rem;"><i class="fas fa-user-plus"></i> Unirse</button>
+                    <div class="landing-actions">
+                        <button class="btn btn-outline lp-btn" onclick="navigate('login')"><i class="fas fa-sign-in-alt"></i> Iniciar Sesión</button>
+                        <button class="btn btn-primary lp-btn" onclick="navigate('register')"><i class="fas fa-user-plus"></i> Unirse</button>
                     </div>
                 </header>
 
-                <div class="landing-hero" style="text-align: center; margin-top: 100px; padding: 0 20px;">
-                    <h1 style="font-size: 5rem; text-transform: uppercase; letter-spacing: 5px; margin-bottom: 25px; color: var(--gold-primary); text-shadow: 0 1px 0 #baa130, 0 2px 0 #ab9227, 0 3px 0 #9c831c, 0 4px 0 #897210, 0 5px 0 #7b660a, 0 6px 0 #6e5904, 0 7px 0 #5f4d02, 0 15px 30px rgba(0,0,0,0.9);">Bienvenido a Universal Profits</h1>
-                    <p style="font-size: 1.4rem; max-width: 900px; margin: 0 auto; color: #ddd; line-height: 1.8; text-shadow: 0 2px 10px rgba(0,0,0,1);">La experiencia financiera del futuro. Súmate a la élite y permite que nuestros algoritmos hagan crecer tu capital utilizando los mercados institucionales de mayor rendimiento en el planeta.</p>
+                <div class="landing-hero">
+                    <h1 class="landing-title">Bienvenido a Universal Profits</h1>
+                    <p class="landing-subtitle">La experiencia financiera del futuro. Súmate a la élite y permite que nuestros algoritmos hagan crecer tu capital utilizando los mercados institucionales de mayor rendimiento en el planeta.</p>
                 </div>
 
-                <div class="landing-assets-grid" style="display: flex; flex-direction: column; gap: 50px; padding: 100px 50px; max-width: 1400px; margin: 0 auto;">
+                <div class="landing-assets-grid">
                     
                     <!-- NASDAQ Row -->
-                    <div class="asset-row tech-card" style="display: flex; align-items: center; justify-content: space-between; gap: 40px; background: rgba(10,10,10,0.7); backdrop-filter: blur(20px); border: 1px solid rgba(212,175,55,0.4); border-radius: 16px; padding: 50px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); position: relative; overflow: hidden; transition: 0.5s;">
+                    <div class="asset-row tech-card">
                         <div class="glow-border" style="position: absolute; top:0; left:0; width:100%; height:4px; background: var(--gold-gradient);"></div>
-                        <div style="flex: 1;">
-                            <h2 style="font-size: 3rem; color: var(--text-main); margin-bottom: 20px; text-shadow: 0 1px 0 #aaa, 0 2px 0 #999, 0 3px 0 #888, 0 4px 5px rgba(0,0,0,0.8);"><i class="fas fa-microchip gold"></i> NASDAQ (US100)</h2>
-                            <p style="font-size: 1.3rem; color: #ccc; line-height: 1.8; margin-bottom: 30px;">El índice supremo que concentra a las 100 principales empresas tecnológicas del mundo. Capturamos los movimientos volátiles de la inteligencia artificial y el sector digital para multiplicar rendimientos agresivamente de manera sistemática.</p>
+                        <div class="asset-info">
+                            <h2><i class="fas fa-microchip gold"></i> NASDAQ (US100)</h2>
+                            <p>El índice supremo que concentra a las 100 principales empresas tecnológicas del mundo. Capturamos los movimientos volátiles de la inteligencia artificial y el sector digital para multiplicar rendimientos agresivamente de manera sistemática.</p>
                         </div>
-                        <div style="background: rgba(212,175,55,0.1); border: 2px solid var(--gold-primary); border-radius: 12px; padding: 40px; text-align: center; min-width: 350px; box-shadow: inset 0 0 20px rgba(212,175,55,0.1);">
-                            <span style="font-size: 1.2rem; color: #ddd; text-transform: uppercase; letter-spacing: 2px;">Rentabilidad Generada</span>
-                            <h3 style="font-size: 4rem; color: var(--gold-primary); margin-top: 15px; text-shadow: 0 1px 0 #9c831c, 0 2px 0 #7b660a, 0 5px 20px rgba(212,175,55,0.5);">400%</h3>
-                            <p style="font-size: 1.2rem; color: var(--gold-primary); margin-top: 5px;">En 3 años</p>
+                        <div class="asset-roi-box">
+                            <span>Rentabilidad Generada</span>
+                            <h3>400%</h3>
+                            <p>En 3 años</p>
                         </div>
                     </div>
 
                     <!-- DOW JONES Row -->
-                    <div class="asset-row tech-card" style="display: flex; align-items: center; justify-content: space-between; gap: 40px; flex-direction: row-reverse; background: rgba(10,10,10,0.7); backdrop-filter: blur(20px); border: 1px solid rgba(212,175,55,0.4); border-radius: 16px; padding: 50px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); position: relative; overflow: hidden; transition: 0.5s;">
+                    <div class="asset-row reverse tech-card">
                         <div class="glow-border" style="position: absolute; top:0; left:0; width:100%; height:4px; background: var(--gold-gradient);"></div>
-                        <div style="flex: 1; text-align: right;">
-                            <h2 style="font-size: 3rem; color: var(--text-main); margin-bottom: 20px; text-shadow: 0 1px 0 #aaa, 0 2px 0 #999, 0 3px 0 #888, 0 4px 5px rgba(0,0,0,0.8);">DOW JONES (US30) <i class="fas fa-industry gold"></i></h2>
-                            <p style="font-size: 1.3rem; color: #ccc; line-height: 1.8; margin-bottom: 30px;">Representa el latido corporativo industrial de Estados Unidos. Proveemos un bloque de equidad estable y sistemático que brinda flujo constante y crecimiento indetenible sobre capitales de gran envergadura y escala institucional.</p>
+                        <div class="asset-info">
+                            <h2>DOW JONES (US30) <i class="fas fa-industry gold"></i></h2>
+                            <p>Representa el latido corporativo industrial de Estados Unidos. Proveemos un bloque de equidad estable y sistemático que brinda flujo constante y crecimiento indetenible sobre capitales de gran envergadura y escala institucional.</p>
                         </div>
-                        <div style="background: rgba(212,175,55,0.1); border: 2px solid var(--gold-primary); border-radius: 12px; padding: 40px; text-align: center; min-width: 350px; box-shadow: inset 0 0 20px rgba(212,175,55,0.1);">
-                            <span style="font-size: 1.2rem; color: #ddd; text-transform: uppercase; letter-spacing: 2px;">Rentabilidad Generada</span>
-                            <h3 style="font-size: 4rem; color: var(--gold-primary); margin-top: 15px; text-shadow: 0 1px 0 #9c831c, 0 2px 0 #7b660a, 0 5px 20px rgba(212,175,55,0.5);">200%</h3>
-                            <p style="font-size: 1.2rem; color: var(--gold-primary); margin-top: 5px;">En 3 años</p>
+                        <div class="asset-roi-box">
+                            <span>Rentabilidad Generada</span>
+                            <h3>200%</h3>
+                            <p>En 3 años</p>
                         </div>
                     </div>
 
                     <!-- ORO Row -->
-                    <div class="asset-row tech-card" style="display: flex; align-items: center; justify-content: space-between; gap: 40px; background: rgba(10,10,10,0.7); backdrop-filter: blur(20px); border: 1px solid rgba(212,175,55,0.4); border-radius: 16px; padding: 50px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); position: relative; overflow: hidden; transition: 0.5s;">
+                    <div class="asset-row tech-card">
                         <div class="glow-border" style="position: absolute; top:0; left:0; width:100%; height:4px; background: var(--gold-gradient);"></div>
-                        <div style="flex: 1;">
-                            <h2 style="font-size: 3rem; color: var(--text-main); margin-bottom: 20px; text-shadow: 0 1px 0 #aaa, 0 2px 0 #999, 0 3px 0 #888, 0 4px 5px rgba(0,0,0,0.8);"><i class="fas fa-coins gold"></i> ORO (XAU/USD)</h2>
-                            <p style="font-size: 1.3rem; color: #ccc; line-height: 1.8; margin-bottom: 30px;">El activo metálico rey de la volatilidad y refugio monetario global. Extraemos liquidez bruta del oro físico usando tecnología punta y algoritmos matemáticos, consiguiendo ratios de precisión inigualables que multiplican fuertemente tu capital.</p>
+                        <div class="asset-info">
+                            <h2><i class="fas fa-coins gold"></i> ORO (XAU/USD)</h2>
+                            <p>El activo metálico rey de la volatilidad y refugio monetario global. Extraemos liquidez bruta del oro físico usando tecnología punta y algoritmos matemáticos, consiguiendo ratios de precisión inigualables que multiplican fuertemente tu capital.</p>
                         </div>
-                        <div style="background: rgba(212,175,55,0.1); border: 2px solid var(--gold-primary); border-radius: 12px; padding: 40px; text-align: center; min-width: 350px; box-shadow: inset 0 0 20px rgba(212,175,55,0.1);">
-                            <span style="font-size: 1.2rem; color: #ddd; text-transform: uppercase; letter-spacing: 2px;">Rentabilidad Generada</span>
-                            <h3 style="font-size: 4rem; color: var(--gold-primary); margin-top: 15px; text-shadow: 0 1px 0 #9c831c, 0 2px 0 #7b660a, 0 5px 20px rgba(212,175,55,0.5);">600%</h3>
-                            <p style="font-size: 1.2rem; color: var(--gold-primary); margin-top: 5px;">En 3 años</p>
+                        <div class="asset-roi-box">
+                            <span>Rentabilidad Generada</span>
+                            <h3>600%</h3>
+                            <p>En 3 años</p>
                         </div>
                     </div>
 
                 </div>
 
                 <!-- Testimonials -->
-                <div class="testimonials-section" style="padding: 100px 50px; background: rgba(0,0,0,0.8); border-top: 1px solid rgba(212,175,55,0.3);">
-                    <h2 style="text-align: center; font-size: 3.5rem; color: #fff; margin-bottom: 80px; text-transform: uppercase; letter-spacing: 3px; text-shadow: 0 1px 0 #444, 0 2px 0 #333, 0 5px 15px rgba(255,255,255,0.2);">Lo que dicen nuestros <span class="gold" style="text-shadow: 0 1px 0 #9c831c, 0 2px 0 #7b660a;">inversores</span></h2>
+                <div class="testimonials-section">
+                    <h2 class="testimonials-title">Lo que dicen nuestros <span class="gold" style="text-shadow: 0 1px 0 #9c831c, 0 2px 0 #7b660a;">inversores</span></h2>
                     
-                    <div style="display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; max-width: 1500px; margin: 0 auto;">
+                    <div class="testimonials-grid">
                         
-                        <div style="flex:1; min-width:380px; background: rgba(15,15,15,0.9); border: 1px solid rgba(212,175,55,0.2); padding: 50px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); transition: transform 0.3s; cursor: pointer;" onmouseover="this.style.transform='translateY(-10px)'" onmouseout="this.style.transform='translateY(0)'">
-                            <div style="color: var(--gold-primary); font-size: 3rem; margin-bottom: 30px;"><i class="fas fa-quote-left"></i></div>
-                            <p style="font-size: 1.2rem; color: #ddd; line-height: 1.8; font-style: italic; margin-bottom: 40px;">"Entré con una fracción de mi capital hace 6 meses. La liquidez que Universal Profits extrae del NASDAQ y sus algoritmos son de otro mundo tecnológico. Las ganancias que he visto crecer diario en mi balance no tienen punto de comparación con la banca tradicional. Es otro nivel de finanzas."</p>
-                            <h4 style="color: var(--gold-primary); font-size: 1.5rem; margin-bottom: 5px;">Alexander H.</h4>
-                            <span style="font-size: 1rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">Inversor Privado VIP</span>
+                        <div class="testimonial-card">
+                            <div class="testimonial-icon"><i class="fas fa-quote-left"></i></div>
+                            <p class="testimonial-text">"Entré con una fracción de mi capital hace 6 meses. La liquidez que Universal Profits extrae del NASDAQ y sus algoritmos son de otro mundo tecnológico. Las ganancias que he visto crecer diario en mi balance no tienen punto de comparación con la banca tradicional. Es otro nivel de finanzas."</p>
+                            <h4 class="testimonial-author">Alexander H.</h4>
+                            <span class="testimonial-role">Inversor Privado VIP</span>
                         </div>
 
-                        <div style="flex:1; min-width:380px; background: rgba(15,15,15,0.9); border: 1px solid rgba(212,175,55,0.2); padding: 50px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); transition: transform 0.3s; cursor: pointer;" onmouseover="this.style.transform='translateY(-10px)'" onmouseout="this.style.transform='translateY(0)'">
-                            <div style="color: var(--gold-primary); font-size: 3rem; margin-bottom: 30px;"><i class="fas fa-quote-left"></i></div>
-                            <p style="font-size: 1.2rem; color: #ddd; line-height: 1.8; font-style: italic; margin-bottom: 40px;">"Ver mis estadísticas diarias y el flujo de caja que genera el fondo manejando el Oro me da la paz mental que buscaba para hacer crecer mis propiedades. Es un sistema altamente sofisticado, sin duda el instrumento que toda persona seria desearía tener en sus manos."</p>
-                            <h4 style="color: var(--gold-primary); font-size: 1.5rem; margin-bottom: 5px;">María Vargas</h4>
-                            <span style="font-size: 1rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">Empresaria Independiente</span>
+                        <div class="testimonial-card">
+                            <div class="testimonial-icon"><i class="fas fa-quote-left"></i></div>
+                            <p class="testimonial-text">"Ver mis estadísticas diarias y el flujo de caja que genera el fondo manejando el Oro me da la paz mental que buscaba para hacer crecer mis propiedades. Es un sistema altamente sofisticado, sin duda el instrumento que toda persona seria desearía tener en sus manos."</p>
+                            <h4 class="testimonial-author">María Vargas</h4>
+                            <span class="testimonial-role">Empresaria Independiente</span>
                         </div>
 
-                        <div style="flex:1; min-width:380px; background: rgba(15,15,15,0.9); border: 1px solid rgba(212,175,55,0.2); padding: 50px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); transition: transform 0.3s; cursor: pointer;" onmouseover="this.style.transform='translateY(-10px)'" onmouseout="this.style.transform='translateY(0)'">
-                            <div style="color: var(--gold-primary); font-size: 3rem; margin-bottom: 30px;"><i class="fas fa-quote-left"></i></div>
-                            <p style="font-size: 1.2rem; color: #ddd; line-height: 1.8; font-style: italic; margin-bottom: 40px;">"La transparencia y la inmediatez algorítmica. Eso es lo mas impactante. Ver tu fondo rendir sistemáticamente en el US30 te da la total seguridad de que estás respaldado por tecnología punta matemática y no por simples conjeturas y azares casuales."</p>
-                            <h4 style="color: var(--gold-primary); font-size: 1.5rem; margin-bottom: 5px;">Roberto Castillo</h4>
-                            <span style="font-size: 1rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">Ingeniero Financiero</span>
+                        <div class="testimonial-card">
+                            <div class="testimonial-icon"><i class="fas fa-quote-left"></i></div>
+                            <p class="testimonial-text">"La transparencia y la inmediatez algorítmica. Eso es lo mas impactante. Ver tu fondo rendir sistemáticamente en el US30 te da la total seguridad de que estás respaldado por tecnología punta matemática y no por simples conjeturas y azares casuales."</p>
+                            <h4 class="testimonial-author">Roberto Castillo</h4>
+                            <span class="testimonial-role">Ingeniero Financiero</span>
                         </div>
                         
                     </div>
                 </div>
 
                 <!-- Footer Call to action -->
-                <div style="padding: 100px 20px; text-align: center; background: linear-gradient(0deg, rgba(0,0,0,1) 0%, rgba(20,20,20,0) 100%);">
-                    <h2 style="font-size: 3rem; color: #fff; margin-bottom: 40px; text-shadow: 0 2px 10px rgba(0,0,0,1);">¿Listo para tomar la decisión financiera de tu vida?</h2>
-                    <button class="btn btn-primary" onclick="navigate('register')" style="font-size: 1.8rem; padding: 25px 60px; border-radius: 50px; text-transform: uppercase; letter-spacing: 2px; box-shadow: 0 10px 40px rgba(212,175,55,0.6); transition: 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">Empieza a Invertir Hoy</button>
+                <div class="landing-footer">
+                    <h2>¿Listo para tomar la decisión financiera de tu vida?</h2>
+                    <button class="btn btn-primary btn-huge" onclick="navigate('register')">Empieza a Invertir Hoy</button>
                     <p style="margin-top: 40px; color: #888; font-size: 1.2rem;">Seguridad tecnológica, estabilidad algorítmica y rendimientos líderes en la industria.</p>
                 </div>
             </div>
