@@ -451,52 +451,101 @@ function renderPrizes(networkVolume) {
     const container = document.getElementById('prizes-grid-container');
     if (!container) return;
 
+    // Los premios funcionan de forma progresiva. 
+    // Premio 1 requiere 20k, Premio 2 requiere OTROS 40k (Total: 60k), Premio 3 requiere OTROS 70k (Total: 130k), etc.
     const prizes = [
-        { id: 1, name: "Primer Premio", req: 20000, desc: "iPhone último modelo <br>+ <strong>500 USD</strong> de inversión en la plataforma.", icon: "fa-mobile-alt" },
-        { id: 2, name: "Segundo Premio", req: 40000, desc: "MacBook Pro última generación.", icon: "fa-laptop" },
-        { id: 3, name: "Tercer Premio", req: 70000, desc: "Resort/viaje valorado en aprox. <strong>5,000 USD</strong>.", icon: "fa-plane-departure" },
-        { id: 4, name: "Cuarto Premio", req: 100000, desc: "10,000 USD <br><span style='color: var(--text-color); font-weight: normal; font-size: 0.85rem;'>o artículo de lujo equivalente (cadena de diamantes o Rolex).</span>", icon: "fa-gem" }
+        { id: 1, name: "Primer Premio", req: 20000, startAt: 0, endAt: 20000, desc: "iPhone último modelo <br>+ <strong>500 USD</strong> de inversión.", icon: "fa-mobile-alt" },
+        { id: 2, name: "Segundo Premio", req: 40000, startAt: 20000, endAt: 60000, desc: "MacBook Pro última generación.", icon: "fa-laptop" },
+        { id: 3, name: "Tercer Premio", req: 70000, startAt: 60000, endAt: 130000, desc: "Resort/viaje valorado en aprox. <strong>5,000 USD</strong>.", icon: "fa-plane-departure" },
+        { id: 4, name: "Cuarto Premio", req: 100000, startAt: 130000, endAt: 230000, desc: "10,000 USD <br><span style='color: var(--text-muted); font-size: 0.85rem;'>o artículo de lujo equivalente (cadena/Rolex).</span>", icon: "fa-gem" }
     ];
 
     let html = "";
-    prizes.forEach(prize => {
-        const unlocked = networkVolume >= prize.req;
+    prizes.forEach((prize) => {
+        const completed = networkVolume >= prize.endAt;
+        let progressAmount = 0;
+        let isCurrentTier = false;
 
-        // Estilos base
+        if (completed) {
+            progressAmount = prize.req; 
+        } else if (networkVolume > prize.startAt) {
+            progressAmount = networkVolume - prize.startAt;
+            isCurrentTier = true;
+        } else {
+            progressAmount = 0;
+        }
+
+        const percentage = Math.min((progressAmount / prize.req) * 100, 100);
+        
         let cardStyle = "display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; ";
         let iconColor = "var(--text-muted)";
         let titleColor = "var(--text-muted)";
         let lockHtml = "";
 
-        if (unlocked) {
-            // Unlocked -> Gold & White
-            cardStyle += "background: var(--gold-primary); color: #fff; box-shadow: 0 5px 15px rgba(212,175,55,0.4);";
-            iconColor = "#fff";
-            titleColor = "#fff";
+        if (completed || isCurrentTier) {
+            // Unlocked or in progress -> Gold/White hybrid
+            cardStyle += "background: rgba(212,175,55,0.05); color: #fff; border: 1px solid var(--gold-dark);";
+            iconColor = "var(--gold-primary)";
+            titleColor = "var(--gold-primary)";
+            
+            if (completed) {
+                cardStyle += "background: var(--gold-primary); color: #fff; box-shadow: 0 5px 15px rgba(212,175,55,0.4); border: 1px solid var(--gold-light);";
+                iconColor = "#fff";
+                titleColor = "#fff";
+            }
         } else {
-            // Locked -> Semi-transparent, lock overlay
+            // Locked totally -> Semi-transparent, lock overlay
             cardStyle += "background: rgba(255,255,255,0.02); opacity: 0.6;";
-            lockHtml = `<div style="position: absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center; background: rgba(0,0,0,0.4); border-radius: 12px; z-index: 10;">
+            lockHtml = `<div style="position: absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center; background: rgba(0,0,0,0.6); border-radius: 12px; z-index: 10;">
                             <i class="fas fa-lock" style="font-size: 4rem; color: rgba(255,255,255,0.2);"></i>
                         </div>`;
         }
+
+        // Only show "Reclamar" if completed
+        const btnHtml = completed ? 
+            `<button class="btn btn-outline mt-3" style="background:#fff; color:var(--gold-primary); border:none; padding:8px 20px; font-weight:bold; cursor:pointer;" onclick="claimPrize('${prize.name}')"><i class="fas fa-gift"></i> Reclamar</button>` 
+            : '';
 
         html += `
             <div class="stat-card" style="${cardStyle}">
                 ${lockHtml}
                 <div style="font-size: 2.5rem; color: ${iconColor}; margin-bottom: 15px;"><i class="fas ${prize.icon}"></i></div>
                 <h4 style="color: ${titleColor};">${prize.name}</h4>
-                <p class="small-text mt-2" style="${unlocked ? 'color:#fff;' : 'color:var(--text-muted);'}">Volumen req: <strong>${prize.req.toLocaleString()} USD</strong></p>
-                <div style="width: 100%; background: rgba(0,0,0,0.2); height: 6px; border-radius: 3px; margin: 10px 0;">
-                    <div style="width: ${Math.min((networkVolume / prize.req) * 100, 100)}%; background: ${unlocked ? '#fff' : 'var(--gold-primary)'}; height: 100%; border-radius: 3px;"></div>
+                <p class="small-text mt-2" style="${completed ? 'color:#fff;' : 'color:#ccc;'}">Volumen req: <strong>${prize.req.toLocaleString()} USD</strong></p>
+                <div style="width: 100%; background: rgba(0,0,0,0.3); height: 8px; border-radius: 4px; margin: 10px 0; overflow:hidden;">
+                    <div style="width: ${percentage}%; background: ${completed ? '#fff' : 'var(--gold-primary)'}; height: 100%; border-radius: 4px; transition: 0.5s;"></div>
                 </div>
+                <p style="font-size:0.85rem; margin-top:-5px; margin-bottom:10px; color:${completed ? '#eee' : 'var(--gold-primary)'}; font-weight: bold;">${progressAmount.toLocaleString()} / ${prize.req.toLocaleString()}</p>
                 <p class="mt-2" style="font-size: 0.9rem;">${prize.desc}</p>
-                ${unlocked ? '<div style="margin-top: 10px; padding: 5px 10px; background: rgba(255,255,255,0.2); border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: var(--gold-primary);"><i class="fas fa-check-circle"></i> DESBLOQUEADO</div>' : ''}
+                ${btnHtml}
             </div>
         `;
     });
 
     container.innerHTML = html;
+}
+
+window.claimPrize = function(prizeName) {
+    if (!currentUser) return;
+    
+    // Validate Firestore is active
+    if (typeof db !== "undefined") {
+        const msgRef = db.collection('chats').doc(currentUser.username).collection('messages').doc();
+        msgRef.set({
+            text: `El usuario ${currentUser.username} acaba de ganar el ${prizeName}. Por favor coordinar la entrega del premio.`,
+            sender: currentUser.username,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => {
+            alert("¡Felicidades! Se ha notificado al soporte. El chat de soporte se abrirá ahora para que puedas hablar e iniciar la entrega de tu premio.");
+            if (typeof showFloatChatBtn === "function") showFloatChatBtn();
+            if (typeof openFloatChat === "function") openFloatChat();
+        }).catch(err => {
+            console.error("Error claimPrize:", err);
+            alert("Error al reclamar el premio. Inténtalo de nuevo.");
+        });
+    } else {
+        alert("Felicidades! Pero la conexión no está activa.");
+    }
 }
 
 function initChart() {
