@@ -189,8 +189,6 @@
                         <span class="badge"
                             style="background: var(--danger); color: white; margin-left: auto; font-size: 0.7rem; padding: 2px 6px; display: none;">0</span>
                     </a>
-                    <a href="#" class="nav-item" onclick="switchDashboardView('ticket')"><i class="fas fa-comments"></i>
-                        Soporte Chat</a>
                     <a href="#" class="nav-item" onclick="switchDashboardView('history')"><i class="fas fa-history"></i>
                         Historial</a>
                     <a href="#" class="nav-item" onclick="switchDashboardView('settings')"><i class="fas fa-cog"></i>
@@ -258,10 +256,6 @@
                             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                             <h3>Crecimiento de la Cuenta</h3>
                             <div>
-                                <button class="btn btn-outline"
-                                    style="padding: 5px 10px; font-size: 0.8rem; margin-right: 10px;"
-                                    onclick="simulateDailyPayment()"><i class="fas fa-clock"></i> Simular 6:00
-                                    PM</button>
                                 <span class="badge gold" id="days-paid"><i class="fas fa-calendar-check"></i> Días
                                     Transcurridos: 0</span>
                             </div>
@@ -845,7 +839,9 @@
                         <div id="admin-chat-reply-panel" style="display:none; margin-top: 20px; background: rgba(212,175,55,0.05); border: 1px solid var(--panel-border); border-radius: 10px; overflow: hidden;">
                             <div style="padding: 15px 20px; border-bottom: 1px solid var(--panel-border); display: flex; justify-content: space-between; align-items: center;">
                                 <h4 class="gold"><i class="fas fa-user"></i> Chat con: <span id="admin-chat-target-name"></span></h4>
-                                <button class="btn btn-danger" style="padding: 6px 14px; font-size: 0.8rem;" onclick="adminEndChat()"><i class="fas fa-times-circle"></i> Finalizar Chat</button>
+                                <div>
+                                    <button class="btn btn-danger" style="padding: 6px 14px; font-size: 0.8rem;" onclick="adminEndChat()"><i class="fas fa-trash"></i> Eliminar Chat</button>
+                                </div>
                             </div>
                             <div id="admin-chat-messages" class="chat-messages" style="max-height: 350px;"></div>
                             <div class="chat-input-area">
@@ -878,83 +874,7 @@
     </section>
     </div>
 
-    <!-- Botón flotante de chat (solo usuarios) -->
-    <div id="float-chat-btn" style="display:none; position:fixed; bottom:25px; right:25px; z-index:500;">
-        <button onclick="toggleFloatChat()" style="
-            width:58px; height:58px; border-radius:50%; border:none;
-            background:var(--gold-gradient); color:#000; font-size:1.4rem;
-            cursor:pointer; box-shadow:0 4px 20px rgba(212,175,55,0.5);
-            display:flex; align-items:center; justify-content:center;
-            transition: transform 0.2s, box-shadow 0.2s;
-        " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-            <i class="fas fa-comments" id="float-chat-icon"></i>
-        </button>
-        <span id="float-chat-badge" style="
-            display:none; position:absolute; top:-4px; right:-4px;
-            background:var(--danger); color:#fff; border-radius:50%;
-            width:18px; height:18px; font-size:0.65rem; font-weight:700;
-            align-items:center; justify-content:center;
-        ">!</span>
-    </div>
-
-    <!-- Panel flotante de chat -->
-    <div id="float-chat-panel" style="
-        display:none; position:fixed; bottom:95px; right:25px; z-index:499;
-        width:340px; max-width:calc(100vw - 30px);
-        background:var(--panel-bg); border:1px solid var(--panel-border);
-        border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.4);
-        backdrop-filter:blur(15px); overflow:hidden;
-        animation: fadeIn 0.2s ease;
-    ">
-        <!-- Header del panel -->
-        <div style="
-            padding:14px 18px; background:var(--gold-gradient);
-            display:flex; align-items:center; justify-content:space-between;
-        ">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <i class="fas fa-headset" style="color:#000; font-size:1.1rem;"></i>
-                <div>
-                    <div style="font-weight:700; color:#000; font-size:0.95rem;">Soporte Universal Profits</div>
-                    <div style="font-size:0.72rem; color:rgba(0,0,0,0.6);" id="float-chat-status-text">Conectando...</div>
-                </div>
-            </div>
-            <button onclick="toggleFloatChat()" style="background:none;border:none;cursor:pointer;color:#000;font-size:1.1rem;padding:4px;">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-
-        <!-- Mensajes -->
-        <div id="float-chat-messages" style="
-            height:280px; overflow-y:auto; padding:15px;
-            display:flex; flex-direction:column; gap:10px;
-            background:rgba(0,0,0,0.1);
-        "></div>
-
-        <!-- Input -->
-        <div id="float-chat-input-area" style="
-            padding:12px; border-top:1px solid var(--panel-border);
-            display:flex; gap:8px; align-items:center;
-        ">
-            <input type="text" id="float-chat-input" placeholder="Escribe un mensaje..."
-                style="flex:1; padding:10px 14px; border-radius:20px; font-size:0.9rem;"
-                onkeydown="if(event.key==='Enter') floatChatSend()">
-            <button onclick="floatChatSend()" style="
-                width:38px; height:38px; border-radius:50%; border:none;
-                background:var(--gold-gradient); color:#000; cursor:pointer;
-                display:flex; align-items:center; justify-content:center; font-size:0.9rem;
-                flex-shrink:0;
-            "><i class="fas fa-paper-plane"></i></button>
-        </div>
-
-        <!-- Chat cerrado -->
-        <div id="float-chat-closed" style="display:none; padding:20px; text-align:center;">
-            <i class="fas fa-lock" style="color:var(--text-muted); font-size:2rem; margin-bottom:10px;"></i>
-            <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px;">Chat finalizado por el administrador.</p>
-            <button class="btn btn-primary" style="padding:8px 18px; font-size:0.85rem;" onclick="openNewChat(); renderFloatChat();">
-                <i class="fas fa-plus"></i> Nuevo Chat
-            </button>
-        </div>
-    </div>
+    <!-- float-chat deleted -->
 
     <!-- Modal Terms -->
 

@@ -198,6 +198,26 @@ function saveLocalDashboardState() {
 }
 setInterval(saveLocalDashboardState, 1000);
 
+// Automatic system checker for properties
+setInterval(() => {
+    if (currentUser && currentUser.isAdmin) {
+        let changed = false;
+        usersDB.forEach(u => {
+            if (applyAutomaticProfits(u)) {
+                saveUserToDB(u);
+                changed = true;
+            }
+        });
+        if (changed) updateDashboardStats();
+    } else if (currentUser) {
+        const u = usersDB.find(u => u.username === currentUser.username);
+        if (u && applyAutomaticProfits(u)) {
+            saveUserToDB(u);
+            updateDashboardStats();
+        }
+    }
+}, 10000); // Check every 10 seconds for real-time magic
+
 document.addEventListener('DOMContentLoaded', () => {
     const savedTheme = localStorage.getItem('up-theme') || 'dark';
     setTheme(savedTheme);
@@ -546,86 +566,99 @@ function updateChart(label, value) {
     growthChartInstance.update();
 }
 
-function simulateDailyPayment() {
-    if (currentUserInvested <= 0) {
-        alert('No tienes ninguna inversión activa para generar rendimientos.');
-        return;
-    }
-
-    // Incrementar dias semanales simulados
-    realDaysElapsed++;
-
-    // Supongamos que día 1 es Lunes, día 6 es sábado, y día 7 (0) es Domingo
-    let dayOfWeek = (realDaysElapsed % 7);
+function applyAutomaticProfits(matchedUser) {
+    if (!matchedUser || !matchedUser.investments) return false;
     
-    const matchedUser = usersDB.find(u => u.username === currentUser.username);
+    // Convert current time to DR time
+    const drTimeString = new Date().toLocaleString("en-US", {timeZone: "America/Santo_Domingo"});
+    const drTime = new Date(drTimeString);
+    
+    let updated = false;
+    let totalAddedBalance = 0;
+    
+    // DR today at 00:00:00
+    const todayStr = `${drTime.getFullYear()}-${drTime.getMonth() + 1}-${drTime.getDate()}`;
+    const todayStart = new Date(todayStr + " 00:00:00").getTime();
+    
+    matchedUser.investments.forEach((inv, index) => {
+        if (!inv.active) return;
+        
+        let invDateStr = inv.date || new Date().toISOString(); 
+        let invDateObj = new Date(new Date(invDateStr).toLocaleString("en-US", {timeZone: "America/Santo_Domingo"}));
+        
+        if (!inv.lastPaidDateStr) {
+            // Assume lastPaid was the day the investment was made, so it pays the next day
+            inv.lastPaidDateStr = `${invDateObj.getFullYear()}-${invDateObj.getMonth() + 1}-${invDateObj.getDate()}`;
+        }
+        
+        let lastPaid = new Date(inv.lastPaidDateStr + " 00:00:00");
+        let maxEarnings = inv.amount * 2;
+        
+        let dailyPct = inv.dailyPct ? (inv.dailyPct / 100) : (inv.amount < 600 ? 0.0080 : (inv.amount < 10000 ? 0.0110 : 0.0180));
+        let earningsPerDay = inv.amount * dailyPct;
 
-    if (dayOfWeek === 6 || dayOfWeek === 0) {
-        // Fin de semana
-        addNotification(
-            "Mercado Cerrado",
-            `Hoy es fin de semana. No se generan rendimientos de inversión los sábados ni domingos.`,
-            "fa-bed",
-            "text-muted"
-        );
-        daysPaid++; // El ciclo de 7 días avanza igual, aunque no se pague
-    } else {
-        
-        let totalEarningsAdded = 0;
-        
-        // Loop over each investment and calculate separatedly
-        if(matchedUser && matchedUser.investments) {
-            matchedUser.investments.forEach((inv, index) => {
-                if(!inv.active) return;
-                
-                let maxEarnings = inv.amount * 2;
-                if(inv.earnings >= maxEarnings) return; // Ya terminó su ciclo de 200%
-                
-                let dailyPercent = 0;
-                if (inv.amount < 600) {
-                    dailyPercent = 0.0080; // 0.80%
-                } else if (inv.amount >= 600 && inv.amount < 10000) {
-                    dailyPercent = 0.0110; // 1.10%
-                } else if (inv.amount >= 10000) {
-                    dailyPercent = 0.0180; // 1.80%
-                }
-                
-                let earningsForThisInv = inv.amount * dailyPercent;
-                
-                if (inv.earnings + earningsForThisInv > maxEarnings) {
-                    earningsForThisInv = maxEarnings - inv.earnings; // limit to 200%
-                    addNotification("Ciclo 200% Finalizado", `La Inversión #${index+1} ha completado su límite máximo del 200%.`, "fa-check-double", "var(--success)");
-                }
-                
-                inv.earnings += earningsForThisInv;
-                totalEarningsAdded += earningsForThisInv;
-            });
+        while (true) {
+            if (inv.earnings >= maxEarnings) {
+                inv.active = false;
+                break;
+            }
             
-            // Recalculate total local vars based on investments arr to stay sync
-            let totalErn = 0;
-            matchedUser.investments.forEach(inv => totalErn += inv.earnings);
-            currentUserEarnings = totalErn;
+            // Next day to pay
+            let actualNextDay = new Date(lastPaid.getFullYear(), lastPaid.getMonth(), lastPaid.getDate() + 1);
+            let actualNextDayTime = actualNextDay.getTime();
+            
+            let canPay = false;
+            
+            if (actualNextDayTime < todayStart) {
+                canPay = true;
+            } else if (actualNextDayTime === todayStart && drTime.getHours() >= 18) {
+                canPay = true;
+            }
+            
+            if (!canPay) break;
+            
+            let dayOfWeek = actualNextDay.getDay(); // 0 Sunday, 6 Saturday
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                let toAdd = earningsPerDay;
+                if (inv.earnings + toAdd > maxEarnings) {
+                    toAdd = maxEarnings - inv.earnings;
+                }
+                inv.earnings += toAdd;
+                totalAddedBalance += toAdd;
+                updated = true;
+                
+                if (matchedUser.username === currentUser?.username) {
+                    daysPaid++;
+                    realDaysElapsed++;
+                    addNotification("Rendimiento Automático", `Has recibido ganancias de la red por <strong>$${toAdd.toFixed(2)}</strong>.`, "fa-sync-alt", "var(--success)");
+                }
+            } else if (matchedUser.username === currentUser?.username) {
+                realDaysElapsed++;
+                daysPaid++; 
+            }
+            
+            lastPaid = actualNextDay;
+            inv.lastPaidDateStr = `${lastPaid.getFullYear()}-${lastPaid.getMonth() + 1}-${lastPaid.getDate()}`;
         }
+    });
 
-        currentUserBalance += totalEarningsAdded; // Adds to available general balance
-
-        // Add specific notification for user
-        if(totalEarningsAdded > 0) {
-            addNotification(
-                "Rendimiento Diario Acreditado",
-                `¡Felicidades! Usted ha recibido ganancias de la red por (<strong>$${totalEarningsAdded.toFixed(2)}</strong>).`,
-                "fa-sync-alt",
-                "var(--success)"
-            );
+    if (updated) {
+        matchedUser.balance += totalAddedBalance;
+        if (!matchedUser.totalHistoricalEarnings) {
+            matchedUser.totalHistoricalEarnings = matchedUser.earnings || 0;
         }
-
-        daysPaid++;
+        matchedUser.totalHistoricalEarnings += totalAddedBalance;
+        matchedUser.earnings = matchedUser.totalHistoricalEarnings;
+        
+        if (currentUser && matchedUser.username === currentUser.username) {
+            currentUserBalance = matchedUser.balance;
+            currentUserEarnings = matchedUser.earnings;
+            updateChart('Ganancia Diaria', currentUserBalance);
+            updateWithdrawalStatus();
+        }
+        return true;
     }
-
-    syncCurrentUserLocalVarsToDB();
-    updateDashboardStats();
-    updateChart('Día ' + daysPaid, currentUserBalance);
-    updateWithdrawalStatus();
+    return false;
 }
 
 function updateWithdrawalStatus() {
@@ -1084,8 +1117,8 @@ function adminEndChat() {
     const u = usersDB.find(u => u.username === adminChatTargetUsername);
     if (!u) return;
 
-    // Borrar completamente el chat
-    u.chat = { status: 'closed', messages: [] };
+    // Borrar completamente el chat (sin rastro y sin recuperar)
+    delete u.chat;
     saveUserToDB(u);
 
     // Ocultar panel de respuesta
@@ -2156,6 +2189,11 @@ function applyInvestment() {
                         investedAmount: netInvestment,
                         date: new Date().toISOString()
                     });
+
+                    // Modificar a Ganancia Total Histórica
+                    if (!referrerUser.totalHistoricalEarnings) referrerUser.totalHistoricalEarnings = referrerUser.earnings || 0;
+                    referrerUser.totalHistoricalEarnings += bonus;
+                    referrerUser.earnings = referrerUser.totalHistoricalEarnings;
 
                     // Notificar al referente si está logueado o simplemente registrarlo
                     if (currentUser && currentUser.username.toLowerCase() === referrerUser.username.toLowerCase()) {
