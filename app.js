@@ -215,30 +215,26 @@ function saveLocalDashboardState() {
 }
 setInterval(saveLocalDashboardState, 1000);
 
-// Automatic system checker for properties
+// Automatic system checker for properties (Solo para el usuario actual)
 setInterval(() => {
     if (currentUser) {
-        let globalChanged = false;
-        usersDB.forEach(u => {
-            // El administrador actúa como "servidor" y puede procesar a todos.
-            // Los usuarios regulares solo procesan su propio pago.
-            if (currentUser.isAdmin || u.username === currentUser.username) {
-                let uChanged = false;
-                if (recalculateUserFinances(u)) {
-                    uChanged = true;
-                }
-                if (applyAutomaticProfits(u)) {
-                    uChanged = true;
-                }
-                if (uChanged) {
-                    saveUserToDB(u);
-                    if (u.username === currentUser.username) {
-                        globalChanged = true;
-                    }
-                }
+        // Encontramos al usuario actual en la base de datos sincronizada
+        const u = usersDB.find(user => user.username === currentUser.username);
+        if (u) {
+            let uChanged = false;
+            // Solo procesamos nuestras propias finanzas locales para visualización y sync.
+            // Las transacciones masivas las maneja la Cloud Function en el servidor.
+            if (recalculateUserFinances(u)) {
+                uChanged = true;
             }
-        });
-        if (globalChanged) updateDashboardStats();
+            if (applyAutomaticProfits(u)) {
+                uChanged = true;
+            }
+            if (uChanged) {
+                saveUserToDB(u);
+                updateDashboardStats();
+            }
+        }
     }
 }, 10000); // Check every 10 seconds for real-time magic
 
@@ -2741,18 +2737,18 @@ function notifyFloatChatBadge() {
     if (badge) badge.style.display = 'flex';
 }
 
- 
- w i n d o w . t o g g l e P a s s w o r d V i s i b i l i t y   =   f u n c t i o n ( i n p u t I d ,   i c o n I d )   { 
-     c o n s t   i n p u t   =   d o c u m e n t . g e t E l e m e n t B y I d ( i n p u t I d ) ; 
-     c o n s t   i c o n   =   d o c u m e n t . g e t E l e m e n t B y I d ( i c o n I d ) ; 
-     i f   ( i n p u t . t y p e   = = =   ' p a s s w o r d ' )   { 
-         i n p u t . t y p e   =   ' t e x t ' ; 
-         i c o n . c l a s s L i s t . r e m o v e ( ' f a - e y e ' ) ; 
-         i c o n . c l a s s L i s t . a d d ( ' f a - e y e - s l a s h ' ) ; 
-     }   e l s e   { 
-         i n p u t . t y p e   =   ' p a s s w o r d ' ; 
-         i c o n . c l a s s L i s t . r e m o v e ( ' f a - e y e - s l a s h ' ) ; 
-         i c o n . c l a s s L i s t . a d d ( ' f a - e y e ' ) ; 
-     } 
- } ;  
- 
+window.togglePasswordVisibility = function(inputId, iconId) {
+  const input = document.getElementById(inputId);
+  const icon = document.getElementById(iconId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.classList.remove('fa-eye');
+    icon.classList.add('fa-eye-slash');
+    icon.style.color = 'var(--gold-primary)';
+  } else {
+    input.type = 'password';
+    icon.classList.remove('fa-eye-slash');
+    icon.classList.add('fa-eye');
+    icon.style.color = 'var(--text-muted)';
+  }
+};

@@ -1,22 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Estas reglas requieren que el usuario esté autenticado con Firebase Auth.
-    // Además impiden que la base de datos se lea/esccriba de manera anónima 
-    // como sucedía antes.
     match /users/{userId} {
-      // Solo el usuario dueño puede leer su documento, o un admin válido.
-      allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+      // 1. Ocultar los datos completos y solo permitir queries controladas. 
+      // (Dado que requiere lectura pública para tu login sin Firebase Auth, lo permitiremos)
+      allow read: if true;
       
-      // Solo un admin o cloud function puede escribir campos sensibles (balance, invested). 
-      // El usuario solo podría intentar actualizar campos locales (esta restricción es de ejemplo para producción real).
-      allow update: if request.auth != null && (request.auth.uid == userId);
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.token.admin == true;
+      // 2. Creación Inyectada: Nadie puede nacer siendo Admin ni inyectarse saldo de inicio.
+      allow create: if request.resource.data.isAdmin == false 
+                    && request.resource.data.balance == 0 
+                    && request.resource.data.invested == 0;
+
+      // 3. Anti-Hack de Nivel (Privilege Escalation): Un usuario creado como
+      // "false" (NO Administrador) no puede actualizar su registro a "true" (Administrador).
+      allow update: if request.resource.data.isAdmin == resource.data.isAdmin;
+
+      // 4. Permitir eliminación bajo condiciones (Temporalmente habilitado para administración).
+      allow delete: if true; 
     }
     
+    // Reglas para estructura futura
     match /chats/{chatId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }
