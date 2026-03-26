@@ -799,6 +799,24 @@
                                     <input type="text" id="admin-edit-wallet" placeholder="Dirección">
                                 </div>
                             </div>
+                            <div class="form-row">
+                                <div class="form-group half">
+                                    <label>Nuevo Nombre de Usuario</label>
+                                    <input type="text" id="admin-edit-new-username" placeholder="Nuevo username (opcional)">
+                                </div>
+                                <div class="form-group half" style="display: flex; align-items: flex-end; padding-bottom: 10px;">
+                                    <label class="checkbox-label" style="display: flex; align-items: center; gap: 10px; margin: 0; cursor: pointer;">
+                                        <input type="checkbox" id="admin-edit-daily-withdraw" style="width: 20px; height: 20px; margin: 0;">
+                                        <span style="font-weight: 600; color: var(--gold-primary);">Habilitar Retiros Diarios</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-row mt-2">
+                                <div class="form-group half">
+                                    <label>Veces que puede retirar al día</label>
+                                    <input type="number" id="admin-edit-withdraw-limit" placeholder="Ej: 1" min="1">
+                                </div>
+                            </div>
                             <div style="display: flex; gap: 10px; margin-top: 15px;">
                                 <button class="btn btn-primary" onclick="adminSaveUser()"><i class="fas fa-save"></i>
                                     Guardar Cambios</button>

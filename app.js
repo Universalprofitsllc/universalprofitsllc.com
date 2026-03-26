@@ -623,7 +623,9 @@ function recalculateUserFinances(matchedUser) {
     let totalWithdrawals = 0;
     if (matchedUser.withdrawalHistory) {
         matchedUser.withdrawalHistory.forEach(w => {
-            totalWithdrawals += w.amount;
+            if (w.status !== 'denied') {
+                totalWithdrawals += w.amount;
+            }
         });
     }
     
@@ -740,6 +742,58 @@ function updateWithdrawalStatus() {
 
     if (!statusBox || !btnWithdraw) return;
 
+    const matchedUser = currentUser ? usersDB.find(u => u.username === currentUser.username) : null;
+    const hasDaily = matchedUser && matchedUser.allowDailyWithdraw;
+
+    const hasPendingWithdraw = matchedUser && matchedUser.withdrawalHistory && matchedUser.withdrawalHistory.some(w => w.status === 'pending');
+
+    if (hasPendingWithdraw) {
+        statusBox.innerHTML = '<h4 style="color: var(--warning);"><i class="fas fa-hourglass-half"></i> Retiro en Proceso</h4>' +
+            '<p class="small-text mt-2">Tienes una solicitud de retiro pendiente. Por favor espera a que sea confirmada por el administrador.</p>';
+        statusBox.style.borderColor = 'var(--warning)';
+        btnWithdraw.disabled = true;
+        btnWithdraw.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Solicitud de retiro pendiente';
+        return;
+    }
+
+    if (currentUser && currentUser.isAdmin) {
+        statusBox.innerHTML = '<h4 style="color: var(--success);"><i class="fas fa-lock-open"></i> Retiros VIP Habilitados</h4>' +
+            '<p class="small-text mt-2">Como administrador, puedes retirar en cualquier momento y sin límite de veces.</p>';
+        statusBox.style.borderColor = 'var(--success)';
+        btnWithdraw.disabled = false;
+        btnWithdraw.innerHTML = 'Solicitar Retiro (Admin)';
+        return;
+    }
+
+    let reachedLimit = false;
+    if (matchedUser) {
+        const drTime = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Santo_Domingo"}));
+        const todayStr = drTime.toISOString().split('T')[0];
+        const limit = matchedUser.allowedWithdrawalsPerDay || 1;
+        if (matchedUser.lastWithdrawalDate === todayStr && (matchedUser.withdrawalsToday || 0) >= limit) {
+            reachedLimit = true;
+        }
+    }
+
+    if (reachedLimit) {
+        statusBox.innerHTML = '<h4 style="color: var(--danger);"><i class="fas fa-times-circle"></i> Límite de Retiros Alcanzado</h4>' +
+            '<p class="small-text mt-2">Has alcanzado tu límite de retiros permitidos por hoy. Vuelve a intentarlo mañana.</p>';
+        statusBox.style.borderColor = 'var(--danger)';
+        btnWithdraw.disabled = true;
+        btnWithdraw.innerHTML = 'Límite alcanzado';
+        return;
+    }
+
+    if (hasDaily) {
+        statusBox.innerHTML = '<h4 style="color: var(--success);"><i class="fas fa-lock-open"></i> Retiros Diarios Habilitados</h4>' +
+            '<p class="small-text mt-2">Tienes habilitado el retiro en cualquier momento sin restricciones de tiempo.</p>';
+        statusBox.style.borderColor = 'var(--success)';
+        btnWithdraw.disabled = false;
+        btnWithdraw.innerHTML = 'Solicitar Retiro Diario';
+        return;
+    }
+
+    btnWithdraw.innerHTML = 'Solicitar Retiro';
     const daysLeft = 7 - (daysPaid % 7);
 
     if (daysPaid > 0 && daysPaid % 7 === 0) { // Es día de retiro (Múltiplo de 7)
@@ -775,14 +829,19 @@ function handleLogin(e) {
         if (currentUser.isAdmin) {
             document.getElementById('admin-menu-item').style.display = 'flex';
 
-            // Re-render pending admin transactions as notifications upon login
             document.querySelector('#admin-transactions-table tbody').innerHTML = '';
             usersDB.forEach(u => {
                 if (u.pendingDeposits && u.pendingDeposits.length > 0) {
                     u.pendingDeposits.forEach(pending => {
                         if (pending.status === 'pending') {
-                            // Re-insert into DOM (simulate table row + notification alert)
                             addPendingAdminTransactionSync(u.username, 'Depósito', pending.amount, pending.id);
+                        }
+                    });
+                }
+                if (u.withdrawalHistory && u.withdrawalHistory.length > 0) {
+                    u.withdrawalHistory.forEach(w => {
+                        if (w.status === 'pending') {
+                            addPendingAdminTransactionSync(u.username, 'Retiro', w.amount, w.id, w.wallet);
                         }
                     });
                 }
@@ -1498,9 +1557,30 @@ function handleWithdraw(e) {
         return;
     }
 
-    if (daysPaid <= 0 || daysPaid % 7 !== 0) {
+    const matchedCurrentUser = usersDB.find(u => u.username === currentUser.username);
+    const hasDaily = matchedCurrentUser && matchedCurrentUser.allowDailyWithdraw;
+
+    if (!currentUser.isAdmin && !hasDaily && (daysPaid <= 0 || daysPaid % 7 !== 0)) {
         alert('Solo puedes retirar dinero en tus días de ciclo correspondientes (cada 7 días).');
         return;
+    }
+
+    if (!currentUser.isAdmin) {
+        const drTime = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Santo_Domingo"}));
+        const todayStr = drTime.toISOString().split('T')[0];
+        
+        if (matchedCurrentUser.lastWithdrawalDate !== todayStr) {
+            matchedCurrentUser.withdrawalsToday = 0;
+            matchedCurrentUser.lastWithdrawalDate = todayStr;
+        }
+
+        const limit = matchedCurrentUser.allowedWithdrawalsPerDay || 1;
+        if ((matchedCurrentUser.withdrawalsToday || 0) >= limit) {
+            alert(`Has alcanzado el límite permitido de ${limit} retiro(s) por día. Por favor inténtalo mañana.`);
+            return;
+        }
+        
+        matchedCurrentUser.withdrawalsToday = (matchedCurrentUser.withdrawalsToday || 0) + 1;
     }
 
     // Simulate deduction (and 5% fee logic simply reducing balance)
@@ -1543,7 +1623,8 @@ function handleWithdraw(e) {
         switchDashboardView('dashboard');
 
         // Solicitar a Admin
-        addPendingAdminTransaction(currentUser.username, 'Retiro', withdrawAmount);
+        addPendingAdminTransaction(currentUser.username, 'Retiro', withdrawAmount, targetWallet);
+        updateWithdrawalStatus();
     }
 }
 
@@ -1736,6 +1817,15 @@ function adminSearchUser() {
         document.getElementById('admin-edit-invested').value = matchedUser.invested;
         document.getElementById('admin-edit-password').value = "";
         document.getElementById('admin-edit-wallet').value = matchedUser.wallet;
+        
+        const newUsernameInput = document.getElementById('admin-edit-new-username');
+        if (newUsernameInput) newUsernameInput.value = "";
+        
+        const dailyToggle = document.getElementById('admin-edit-daily-withdraw');
+        if (dailyToggle) dailyToggle.checked = !!matchedUser.allowDailyWithdraw;
+
+        const limitInput = document.getElementById('admin-edit-withdraw-limit');
+        if (limitInput) limitInput.value = matchedUser.allowedWithdrawalsPerDay || 1;
 
         document.getElementById('admin-user-edit-section').style.display = 'block';
     } else {
@@ -1753,6 +1843,42 @@ function adminSaveUser() {
         matchedUser.balance = parseFloat(document.getElementById('admin-edit-balance').value) || 0;
         matchedUser.invested = parseFloat(document.getElementById('admin-edit-invested').value) || 0;
         matchedUser.wallet = document.getElementById('admin-edit-wallet').value;
+
+        const dailyToggle = document.getElementById('admin-edit-daily-withdraw');
+        if (dailyToggle) {
+            matchedUser.allowDailyWithdraw = dailyToggle.checked;
+        }
+
+        const limitInput = document.getElementById('admin-edit-withdraw-limit');
+        if (limitInput && limitInput.value) {
+            matchedUser.allowedWithdrawalsPerDay = parseInt(limitInput.value) || 1;
+        }
+
+        let oldUsername = matchedUser.username;
+        const newUsernameInput = document.getElementById('admin-edit-new-username');
+        if (newUsernameInput && newUsernameInput.value.trim() !== "") {
+            const newUsername = newUsernameInput.value.trim();
+            if (newUsername !== matchedUser.username) {
+                // Check if already in use
+                const existing = usersDB.find(u => u.username.toLowerCase() === newUsername.toLowerCase());
+                if (existing) {
+                    alert("Ese nombre de usuario ya está en uso. Elige otro.");
+                    return;
+                }
+                
+                matchedUser.username = newUsername;
+
+                // Update referrers
+                usersDB.forEach(u => {
+                    if (u.referrer && u.referrer.toLowerCase() === oldUsername.toLowerCase()) {
+                        u.referrer = newUsername;
+                        saveUserToDB(u);
+                    }
+                });
+                
+                currentlyEditingUsername = newUsername;
+            }
+        }
 
         // Handle referral bonus for new investment differences
         if (matchedUser.invested > oldInvested && matchedUser.referrer) {
@@ -1784,6 +1910,9 @@ function adminSaveUser() {
             matchedUser.password = newPass;
         }
 
+        if (oldUsername !== matchedUser.username) {
+            deleteUserFromDB(oldUsername);
+        }
         saveUserToDB(matchedUser);
 
         alert("Los datos del usuario " + matchedUser.username + " han sido actualizados y guardados en la BD.");
@@ -1791,11 +1920,14 @@ function adminSaveUser() {
         renderAdminUserList(); // Update list after save
 
         // If the admin is somehow editing themselves, update their whole specific UI
-        if (currentUser.username === matchedUser.username) {
+        if (currentUser.username === oldUsername || currentUser.username === matchedUser.username) {
+            currentUser.username = matchedUser.username;
             currentUserBalance = matchedUser.balance;
             currentUserInvested = matchedUser.invested;
             savedWalletAddress = matchedUser.wallet;
             updateDashboardStats();
+            const welcomeEl = document.getElementById('welcome-username');
+            if (welcomeEl) welcomeEl.innerText = matchedUser.firstname ? matchedUser.firstname : matchedUser.username;
         }
 
         document.getElementById('admin-user-edit-section').style.display = 'none';
@@ -2023,7 +2155,7 @@ function checkApprovedDeposits() {
 }
 
 // Admin Panel Transactions
-function addPendingAdminTransaction(username, type, amount) {
+function addPendingAdminTransaction(username, type, amount, extraOpt = null) {
     const tBody = document.querySelector('#admin-transactions-table tbody');
     const emptyRow = document.getElementById('empty-transactions-msg');
     if (emptyRow && emptyRow.parentNode) {
@@ -2045,7 +2177,7 @@ function addPendingAdminTransaction(username, type, amount) {
              msg = `El usuario <strong>${username}</strong> ha reportado un depósito de <strong>$${amount}</strong>. Revisa el Panel de Admin para confirmarlo.`;
              color = 'gold';
         } else {
-             msg = `El usuario <strong>${username}</strong> ha solicitado un retiro de <strong>$${amount}</strong>. Revisa el Panel de Admin para procesarlo.`;
+             msg = `El usuario <strong>${username}</strong> ha solicitado un retiro de <strong>$${amount}</strong>.<br>Wallet: <strong style="color:var(--gold-primary)">${extraOpt || 'N/A'}</strong><br>Revisa el Panel de Admin para procesarlo.`;
              color = 'var(--danger)';
         }
 
@@ -2074,7 +2206,7 @@ function addPendingAdminTransaction(username, type, amount) {
     let typeLabel = "";
     if(type === 'Depósito') typeLabel = `<span style="color: var(--gold-primary)">Depósito</span>`;
     else if(type === 'Ticket') typeLabel = `<span style="color: var(--gold-primary)"><i class="fas fa-headset"></i> Soporte</span>`;
-    else typeLabel = `<span style="color: var(--danger)">Retiro</span>`;
+    else typeLabel = `<span style="color: var(--danger)">Retiro<br><small style="font-size: 0.8em; opacity: 0.8;">Wallet: ${extraOpt || 'N/A'}</small></span>`;
     
     let actionButtons = "";
     if(type === 'Ticket') {
@@ -2108,7 +2240,7 @@ function addPendingAdminTransaction(username, type, amount) {
     tBody.appendChild(row);
 }
 
-function addPendingAdminTransactionSync(username, type, amount, pendingId) {
+function addPendingAdminTransactionSync(username, type, amount, pendingId, extraOpt = null) {
     const tBody = document.querySelector('#admin-transactions-table tbody');
     const emptyRow = document.getElementById('empty-transactions-msg');
     if (emptyRow && emptyRow.parentNode) {
@@ -2117,7 +2249,7 @@ function addPendingAdminTransactionSync(username, type, amount, pendingId) {
 
     let msg = type === 'Depósito' ?
         `El usuario <strong>${username}</strong> ha reportado un depósito de <strong>$${amount}</strong>. Revisa el Panel de Admin para confirmarlo.` :
-        `El usuario <strong>${username}</strong> ha solicitado un retiro de <strong>$${amount}</strong>. Revisa el Panel de Admin para procesarlo.`;
+        `El usuario <strong>${username}</strong> ha solicitado un retiro de <strong>$${amount}</strong>.<br>Wallet: <strong style="color:var(--gold-primary)">${extraOpt || 'N/A'}</strong><br>Revisa el Panel de Admin para procesarlo.`;
 
     let color = type === 'Depósito' ? 'gold' : 'var(--danger)';
     addNotification(
@@ -2134,7 +2266,7 @@ function addPendingAdminTransactionSync(username, type, amount, pendingId) {
     row.style.borderBottom = '1px solid rgba(212,175,55,0.1)';
     row.style.transition = 'background-color 0.5s ease';
 
-    const typeLabel = type === 'Depósito' ? `<span style="color: var(--gold-primary)">Depósito</span>` : `<span style="color: var(--danger)">Retiro</span>`;
+    const typeLabel = type === 'Depósito' ? `<span style="color: var(--gold-primary)">Depósito</span>` : `<span style="color: var(--danger)">Retiro<br><small style="font-size: 0.8em; opacity: 0.8;">Wallet: ${extraOpt || 'N/A'}</small></span>`;
 
     row.innerHTML = `
         <td style="padding: 10px;">${username}</td>
@@ -2209,7 +2341,17 @@ function denyTransactionAdmin(btnElement, type, username, amount) {
         alert("❌ Has marcado el depósito como NO RECIBIDO. El usuario ha sido notificado.");
     } else {
         // Devolver el dinero al balance
-        alert("❌ Has denegado el retiro. Recomendamos contactar al usuario.");
+        const dbUser = usersDB.find(u => u.username === username);
+        if (dbUser && dbUser.withdrawalHistory) {
+            const wd = dbUser.withdrawalHistory.slice().reverse().find(w => w.amount === amount && w.status === 'pending');
+            if (wd) {
+                wd.status = 'denied';
+                wd.processedDate = new Date().toISOString();
+                dbUser.isRecalculatedFromStart_v3 = false; // Fuerza recálculo si usara la vieja formula, aunque la nueva lo excluye automático de `totalWithdrawals`
+            }
+            saveUserToDB(dbUser);
+        }
+        alert("❌ Has denegado el retiro. El dinero regresó al balance del usuario.");
     }
 }
 
