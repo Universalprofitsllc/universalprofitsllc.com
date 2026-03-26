@@ -2740,3 +2740,19 @@ function notifyFloatChatBadge() {
     const badge = document.getElementById('float-chat-badge');
     if (badge) badge.style.display = 'flex';
 }
+
+ 
+ w i n d o w . t o g g l e P a s s w o r d V i s i b i l i t y   =   f u n c t i o n ( i n p u t I d ,   i c o n I d )   { 
+     c o n s t   i n p u t   =   d o c u m e n t . g e t E l e m e n t B y I d ( i n p u t I d ) ; 
+     c o n s t   i c o n   =   d o c u m e n t . g e t E l e m e n t B y I d ( i c o n I d ) ; 
+     i f   ( i n p u t . t y p e   = = =   ' p a s s w o r d ' )   { 
+         i n p u t . t y p e   =   ' t e x t ' ; 
+         i c o n . c l a s s L i s t . r e m o v e ( ' f a - e y e ' ) ; 
+         i c o n . c l a s s L i s t . a d d ( ' f a - e y e - s l a s h ' ) ; 
+     }   e l s e   { 
+         i n p u t . t y p e   =   ' p a s s w o r d ' ; 
+         i c o n . c l a s s L i s t . r e m o v e ( ' f a - e y e - s l a s h ' ) ; 
+         i c o n . c l a s s L i s t . a d d ( ' f a - e y e ' ) ; 
+     } 
+ } ;  
+ 
