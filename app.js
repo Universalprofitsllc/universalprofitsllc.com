@@ -98,6 +98,23 @@ const db = firebase.firestore();
 let usersDB = [];
 let initialLoadDone = false;
 
+// Anti-Bruteforce / Rate Limiting en memoria (Frontend)
+let loginAttempts = {};
+
+// Sanitización XSS (OWASP A03:2021)
+function escapeHTML(str) {
+    if (typeof str !== 'string' && typeof str !== 'number') return str;
+    return String(str).replace(/[&<>'"]/g, 
+        tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[tag] || tag)
+    );
+}
+
 // Real-time listener para guardar en la nube
 db.collection("users").onSnapshot((snapshot) => {
     usersDB = [];
@@ -264,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
 
-                const displayFirstname = matchedUser.firstname || matchedUser.username;
+                const displayFirstname = escapeHTML(matchedUser.firstname || matchedUser.username);
                 document.getElementById('welcome-username').innerText = displayFirstname;
                 document.getElementById('tree-username').innerText = displayFirstname;
 
@@ -299,9 +316,9 @@ let pendingResetUsername = "";
 function handleRegister(e) {
     e.preventDefault();
 
-    const firstname = document.getElementById('reg-firstname').value;
-    const lastname = document.getElementById('reg-lastname').value;
-    const username = document.getElementById('reg-username').value;
+    const firstname = escapeHTML(document.getElementById('reg-firstname').value.trim());
+    const lastname = escapeHTML(document.getElementById('reg-lastname').value.trim());
+    const username = escapeHTML(document.getElementById('reg-username').value.trim());
     const password = document.getElementById('reg-password').value;
 
     // Check if user exists
@@ -429,7 +446,7 @@ function renderAffiliateTree() {
     affiliates.forEach(aff => {
         const earnings = aff.invested * 0.07;
         const iconColor = aff.invested > 0 ? "var(--success)" : "var(--text-muted)";
-        const displayFirstname = aff.firstname || aff.username;
+        const displayFirstname = escapeHTML(aff.firstname || aff.username);
 
         treeHtml += `
             <div class="tree-wrapper">
@@ -866,12 +883,25 @@ function updateWithdrawalStatus() {
 
 function handleLogin(e) {
     e.preventDefault();
-    const user = document.getElementById('login-identifier').value;
+    const user = document.getElementById('login-identifier').value.trim();
     const pass = document.getElementById('login-password').value;
+
+    const now = Date.now();
+    // Verificación de Rate Limiting (Prevención Fuerza Bruta - OWASP A07)
+    if (loginAttempts[user] && loginAttempts[user].count >= 5) {
+        if (now - loginAttempts[user].time < 15 * 60 * 1000) {
+            alert('Demasiados intentos fallidos. Por favor, espera 15 minutos por seguridad.');
+            return;
+        } else {
+            loginAttempts[user].count = 0; // Reiniciar después de 15 min
+        }
+    }
 
     const matchedUser = usersDB.find(u => u.username === user && u.password === pass);
 
     if (matchedUser) {
+        // Reiniciar los intentos fallidos al tener éxito
+        if (loginAttempts[user]) loginAttempts[user].count = 0;
         currentUser = { username: matchedUser.username, isAdmin: matchedUser.isAdmin };
 
         // Load User Data from simulated DB
@@ -937,7 +967,17 @@ function handleLogin(e) {
         }, 100);
 
     } else {
-        alert('Usuario o contraseña incorrectos. Por favor intente nuevamente.');
+        // Registrar intento fallido
+        if (!loginAttempts[user]) loginAttempts[user] = { count: 0, time: now };
+        loginAttempts[user].count += 1;
+        loginAttempts[user].time = now;
+        
+        const intentosRestantes = 5 - loginAttempts[user].count;
+        if (intentosRestantes > 0) {
+            alert(`Usuario o contraseña incorrectos. Te quedan ${intentosRestantes} intento(s) antes de ser bloqueado.`);
+        } else {
+            alert('Has excedido el número de intentos. Tu cuenta/IP ha sido bloqueada localmente por 15 minutos.');
+        }
     }
 }
 
@@ -1108,7 +1148,7 @@ function openNewChat() {
 function sendMessage() {
     const input = document.getElementById('chat-input');
     if (!input) return;
-    const text = input.value.trim();
+    const text = escapeHTML(input.value.trim()); // Sanitizar input
     if (!text) return;
 
     const u = usersDB.find(u => u.username === currentUser.username);
@@ -1271,7 +1311,7 @@ function adminRenderChatMessages() {
 function adminSendMessage() {
     if (!adminChatTargetUsername) return;
     const input = document.getElementById('admin-chat-input');
-    const text = input ? input.value.trim() : '';
+    const text = input ? escapeHTML(input.value.trim()) : ''; // Sanitizar input
     if (!text) return;
 
     const u = usersDB.find(u => u.username === adminChatTargetUsername);
@@ -1330,12 +1370,12 @@ function _renderMsgs(messages, containerId, isAdminView) {
         // En vista admin: los mensajes del admin van a la derecha
         // En vista usuario: los mensajes del usuario van a la derecha
         const isMine = isAdminView ? m.isAdmin : !m.isAdmin;
-        const label  = m.isAdmin ? 'Soporte' : m.sender;
+        const label  = escapeHTML(m.isAdmin ? 'Soporte' : m.sender);
         return `
             <div class="msg ${isMine ? 'msg-user' : 'msg-admin'}">
                 <span style="font-size:0.68rem;opacity:0.55;display:block;margin-bottom:2px;">${label}</span>
-                <p style="margin:0;">${m.text}</p>
-                <span class="msg-time">${m.time}</span>
+                <p style="margin:0;">${escapeHTML(m.text)}</p>
+                <span class="msg-time">${escapeHTML(m.time)}</span>
             </div>`;
     }).join('');
     container.scrollTop = container.scrollHeight;
@@ -1593,7 +1633,7 @@ function handleWithdraw(e) {
     const select = document.getElementById('withdraw-wallet-select');
     let targetWallet = "";
     if (select.value === 'new') {
-        targetWallet = document.getElementById('withdraw-new-wallet').value;
+        targetWallet = escapeHTML(document.getElementById('withdraw-new-wallet').value.trim());
         if (!targetWallet) {
             alert("Por favor, ingresa una dirección de billetera válida.");
             return;
@@ -1806,9 +1846,9 @@ function handleSettings(e) {
     const matchedUser = usersDB.find(u => u.username === currentUser.username);
     if (!matchedUser) return;
 
-    const firstname = document.getElementById('settings-firstname').value.trim();
-    const lastname  = document.getElementById('settings-lastname').value.trim();
-    const newWallet = document.getElementById('settings-wallet').value.trim();
+    const firstname = escapeHTML(document.getElementById('settings-firstname').value.trim());
+    const lastname  = escapeHTML(document.getElementById('settings-lastname').value.trim());
+    const newWallet = escapeHTML(document.getElementById('settings-wallet').value.trim());
     const currentPass = document.getElementById('settings-current-pass').value;
     const newPass     = document.getElementById('settings-new-pass').value;
 

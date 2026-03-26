@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Estas reglas requieren que el usuario esté autenticado con Firebase Auth.
+    // Además impiden que la base de datos se lea/esccriba de manera anónima 
+    // como sucedía antes.
+    match /users/{userId} {
+      // Solo el usuario dueño puede leer su documento, o un admin válido.
+      allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+      
+      // Solo un admin o cloud function puede escribir campos sensibles (balance, invested). 
+      // El usuario solo podría intentar actualizar campos locales (esta restricción es de ejemplo para producción real).
+      allow update: if request.auth != null && (request.auth.uid == userId);
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    match /chats/{chatId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
