@@ -794,15 +794,20 @@ function updateWithdrawalStatus() {
     }
 
     btnWithdraw.innerHTML = 'Solicitar Retiro';
-    const daysLeft = 7 - (daysPaid % 7);
+    let daysSinceLast = daysPaid;
+    if (matchedUser && matchedUser.lastWithdrawalDaysPaid !== undefined) {
+        daysSinceLast = daysPaid - matchedUser.lastWithdrawalDaysPaid;
+    }
 
-    if (daysPaid > 0 && daysPaid % 7 === 0) { // Es día de retiro (Múltiplo de 7)
+    const daysLeft = 7 - daysSinceLast;
+
+    if (daysPaid > 0 && daysSinceLast >= 7) { 
         statusBox.innerHTML = '<h4 style="color: var(--success);"><i class="fas fa-lock-open"></i> Retiros Habilitados</h4>' +
-            '<p class="small-text mt-2">Hoy es tu día de retiro. Puedes solicitar tus fondos ahora.</p>';
+            '<p class="small-text mt-2">Ya has cumplido tu ciclo de 7 días. Puedes solicitar tus fondos ahora.</p>';
         statusBox.style.borderColor = 'var(--success)';
         btnWithdraw.disabled = false;
     } else {
-        const remaining = daysPaid === 0 ? 7 : daysLeft;
+        const remaining = daysLeft > 0 ? daysLeft : 7;
         statusBox.innerHTML = '<h4 style="color: var(--danger);"><i class="fas fa-lock"></i> Retiros Bloqueados</h4>' +
             `<p class="small-text mt-2">Aún no cumples tu ciclo. Días restantes para su próximo periodo de retiro: <strong id="withdraw-days-left">${remaining} días</strong></p>`;
         statusBox.style.borderColor = 'var(--danger)';
@@ -1560,8 +1565,13 @@ function handleWithdraw(e) {
     const matchedCurrentUser = usersDB.find(u => u.username === currentUser.username);
     const hasDaily = matchedCurrentUser && matchedCurrentUser.allowDailyWithdraw;
 
-    if (!currentUser.isAdmin && !hasDaily && (daysPaid <= 0 || daysPaid % 7 !== 0)) {
-        alert('Solo puedes retirar dinero en tus días de ciclo correspondientes (cada 7 días).');
+    let daysSinceLast = daysPaid;
+    if (matchedCurrentUser && matchedCurrentUser.lastWithdrawalDaysPaid !== undefined) {
+        daysSinceLast = daysPaid - matchedCurrentUser.lastWithdrawalDaysPaid;
+    }
+
+    if (!currentUser.isAdmin && !hasDaily && daysSinceLast < 7) {
+        alert('Solo puedes retirar dinero tras cumplir un ciclo de 7 días desde tu último retiro.');
         return;
     }
 
@@ -1581,6 +1591,7 @@ function handleWithdraw(e) {
         }
         
         matchedCurrentUser.withdrawalsToday = (matchedCurrentUser.withdrawalsToday || 0) + 1;
+        matchedCurrentUser.lastWithdrawalDaysPaid = daysPaid; // Reset the 7-day countdown!
     }
 
     // Simulate deduction (and 5% fee logic simply reducing balance)
