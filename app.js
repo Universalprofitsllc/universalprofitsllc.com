@@ -157,6 +157,10 @@ db.collection("users").onSnapshot((snapshot) => {
                     loadSettingsForm();
                 }
             }
+        } else if (initialLoadDone && currentUser && !matchedUser && !currentUser.isAdmin) {
+            // Si el usuario ya no existe (borrado o renombrado) y no es admin, lo sacamos
+            console.warn("Sesión invalidada por cambio administrativo.");
+            logout();
         }
     } else if (initialLoadDone && currentUser && currentUser.isAdmin) {
         renderAdminUserList();
