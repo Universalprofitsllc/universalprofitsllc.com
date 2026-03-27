@@ -2928,8 +2928,11 @@ window.addEventListener('load', () => {
         const regRefInput = document.getElementById('reg-ref');
         if (regRefInput) {
             regRefInput.value = refCode;
-            // Dirigir automáticamente a la vista de registro si hay un referido
-            navigate('register');
+            
+            // Forzar navegación al registro
+            setTimeout(() => {
+                navigate('register');
+            }, 100);
         }
     }
 });
