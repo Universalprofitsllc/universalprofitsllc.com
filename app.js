@@ -2146,7 +2146,7 @@ async function adminSaveUser() {
         // Guardar/Actualizar en Firestore
         await saveUserToDB(matchedUser);
 
-        alert("🎯 ¡TRANSFORMACIÓN COMPLETADA!\n\nEl usuario ahora es " + matchedUser.username + ". Los cambios son permanentes y la sesión antigua ha sido cerrada.");
+        alert(`✅ ¡TRANSFORMACIÓN COMPLETADA!\n\nEl usuario '${matchedUser.username}' ha sido actualizado y su sesión antigua invalidada.`);
 
         renderAdminUserList(); 
         adminSearchUser(matchedUser.username); // Refrescar el panel con el nuevo estado
@@ -2169,34 +2169,33 @@ async function adminSaveUser() {
 
 async function adminDeleteUser() {
     if (!currentUser || !currentUser.isAdmin || !currentlyEditingUsername) return;
-
     if (currentlyEditingUsername === currentUser.username) {
-        alert("🛡️ ¡Seguridad! No puedes eliminar tu propia cuenta de administrador.");
+        alert("🛡️ No puedes borrar tu propia cuenta de administrador.");
         return;
     }
-
-    if (confirm(`🧨 ¡ELIMINACIÓN TOTAL!\n\n¿Estás 100% seguro de borrar permanentemente a '${currentlyEditingUsername}'?\n\nEsta acción eliminará su balance, inversiones, historial y le cerrará la sesión de inmediato.`)) {
+    if (confirm(`🧨 ¿BORRAR PERMANENTEMENTE A '${currentlyEditingUsername}'?\n\nEsta acción eliminará su balance, historial y acceso para siempre.`)) {
         try {
             const victim = currentlyEditingUsername;
-            
-            // 1. Borrar de Firestore (Base de datos real)
             await deleteUserFromDB(victim);
             
-            // 2. Limpiar del Caché Local (Sincronización instantánea web)
+            // Limpiar rastro en referidos
+            for (let u of usersDB) {
+                if (u.referrer && u.referrer.toLowerCase() === victim.toLowerCase()) {
+                    u.referrer = "";
+                    await saveUserToDB(u);
+                }
+            }
+
+            // Actualizar interfaz al instante
             usersDB = usersDB.filter(u => u.username !== victim);
-            
-            // 3. Resetear UI del Admin
             document.getElementById('admin-user-edit-section').style.display = 'none';
             document.getElementById('admin-search-user').value = "";
             currentlyEditingUsername = "";
-            
-            // 4. Forzar re-dibujado de la lista
             renderAdminUserList();
-
-            alert(`✅ ¡LOGRADO! El usuario ${victim} ha sido ELIMINADO de la base de datos y de la página.`);
+            alert(`✅ ¡BORRADO! El usuario '${victim}' ha sido eliminado exitosamente.`);
         } catch (err) {
             console.error(err);
-            alert("❌ Error al intentar eliminar: " + err.message);
+            alert("❌ ERROR: No se pudo eliminar al usuario. " + err.message);
         }
     }
 }
