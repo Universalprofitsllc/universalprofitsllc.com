@@ -744,6 +744,8 @@ function recalculateUserFinances(matchedUser) {
     });
     } // End of if (matchedUser.investments)
 
+    totalEarnings += (matchedUser.manualEarningsAdjustment || 0);
+
     let totalBonus = 0;
     if (matchedUser.bonusHistory) {
         matchedUser.bonusHistory.forEach(b => totalBonus += b.amount);
@@ -2014,6 +2016,7 @@ function adminSearchUser() {
         document.getElementById('admin-edit-username').innerText = matchedUser.username;
         document.getElementById('admin-edit-balance').value = matchedUser.balance;
         document.getElementById('admin-edit-invested').value = matchedUser.invested;
+        document.getElementById('admin-edit-earnings').value = matchedUser.manualEarningsAdjustment || 0;
         document.getElementById('admin-edit-password').value = "";
         document.getElementById('admin-edit-wallet').value = matchedUser.wallet;
         
@@ -2041,6 +2044,7 @@ async function adminSaveUser() {
         const oldInvested = matchedUser.invested;
         matchedUser.balance = parseFloat(document.getElementById('admin-edit-balance').value) || 0;
         matchedUser.invested = parseFloat(document.getElementById('admin-edit-invested').value) || 0;
+        matchedUser.manualEarningsAdjustment = parseFloat(document.getElementById('admin-edit-earnings').value) || 0;
         matchedUser.wallet = document.getElementById('admin-edit-wallet').value;
 
         const dailyToggle = document.getElementById('admin-edit-daily-withdraw');
