@@ -2171,20 +2171,32 @@ async function adminDeleteUser() {
     if (!currentUser || !currentUser.isAdmin || !currentlyEditingUsername) return;
 
     if (currentlyEditingUsername === currentUser.username) {
-        alert("No puedes eliminar tu propio usuario administrador principal.");
+        alert("🛡️ ¡Seguridad! No puedes eliminar tu propia cuenta de administrador.");
         return;
     }
 
-    if (confirm(`¿ELIMINAR COMPLETAMENTE a '${currentlyEditingUsername}'?\n\nSe borrará: Datos, Balance, Inversiones e Historial permanentemente.`)) {
-        const index = usersDB.findIndex(u => u.username === currentlyEditingUsername);
-        if (index > -1) {
-            usersDB.splice(index, 1);
-            await deleteUserFromDB(currentlyEditingUsername);
-            alert(`¡ELIMINADO! El usuario ${currentlyEditingUsername} ha sido borrado permanentemente.`);
+    if (confirm(`🧨 ¡ELIMINACIÓN TOTAL!\n\n¿Estás 100% seguro de borrar permanentemente a '${currentlyEditingUsername}'?\n\nEsta acción eliminará su balance, inversiones, historial y le cerrará la sesión de inmediato.`)) {
+        try {
+            const victim = currentlyEditingUsername;
+            
+            // 1. Borrar de Firestore (Base de datos real)
+            await deleteUserFromDB(victim);
+            
+            // 2. Limpiar del Caché Local (Sincronización instantánea web)
+            usersDB = usersDB.filter(u => u.username !== victim);
+            
+            // 3. Resetear UI del Admin
             document.getElementById('admin-user-edit-section').style.display = 'none';
             document.getElementById('admin-search-user').value = "";
             currentlyEditingUsername = "";
+            
+            // 4. Forzar re-dibujado de la lista
             renderAdminUserList();
+
+            alert(`✅ ¡LOGRADO! El usuario ${victim} ha sido ELIMINADO de la base de datos y de la página.`);
+        } catch (err) {
+            console.error(err);
+            alert("❌ Error al intentar eliminar: " + err.message);
         }
     }
 }
